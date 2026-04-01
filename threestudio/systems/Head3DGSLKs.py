@@ -200,13 +200,20 @@ class Head3DGSLKsRig(BaseLift3DSystem):
 
         prompt_utils = self.prompt_processor()
         images = out["comp_rgb"]
-        control_images = batch["flame_conds"]
-        # control_images = out["depth"]
+        flame_conds = batch["flame_conds"]
+
+        if isinstance(flame_conds, dict):
+            control_images = [
+                flame_conds['pose'].permute(0, 3, 1, 2),
+                flame_conds['depth'].permute(0, 3, 1, 2),
+            ]
+        else:
+            control_images = flame_conds.permute(0, 3, 1, 2)
 
         guidance_eval = False
 
         guidance_out = self.guidance(
-            images.permute(0, 3, 1, 2), control_images.permute(0, 3, 1, 2), prompt_utils,
+            images.permute(0, 3, 1, 2), control_images, prompt_utils,
             **batch, rgb_as_latents=False,
         )
 

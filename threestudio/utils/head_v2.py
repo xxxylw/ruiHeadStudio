@@ -406,13 +406,51 @@ class FlamePointswRandomExp:
                 cond_lmks = self.get_cond_lmk_mediapipe(vertices, faces, cameras)
             else:
                 cond_lmks = self.get_cond_lmk_openpose(joints, cameras)
-            # result = {
-            #     'depths': cond_depths,
-            #     'lmks': torch.from_numpy(cond_lmks)
-            # }
             result = torch.from_numpy(cond_lmks)
         else:
             cond_depths = self.get_cond_depth(vertices, faces, cameras, mesh_vis)
             result = cond_depths
 
         return result
+
+    def get_cond_pose_depth(self, dist=0.6, elev=0, azim=0, at=((0, 0, 0),), up=((0, 1, 0),), fov=40,
+                            betas=None, expression=None, jaw_pose=None, leye_pose=None, reye_pose=None,
+                            neck_pose=None):
+        """Return both OpenPose landmark image and depth image for MultiControlNet."""
+        if betas is None:
+            betas = self.betas
+        if expression is None:
+            expression = torch.zeros([1, self.num_expression], device=self.device)
+        output = self.model(
+            betas=betas,
+            expression=expression,
+            jaw_pose=jaw_pose,
+            leye_pose=leye_pose,
+            reye_pose=reye_pose,
+            neck_pose=neck_pose,
+            return_verts=True
+        )
+        vertices = output.vertices.squeeze()
+        vertices = (vertices - self.center) * self.scale
+        vertices *= 1.1 ** (-self.flame_scale)
+
+        joints = output.joints.detach().squeeze()
+
+        faces = torch.tensor(self.model.faces.astype(np.int32), dtype=torch.int32, device=self.device)
+
+        cameras = self.get_camera(
+            dist, elev, (azim - 90),
+            self.camera_conversion(at),
+            self.camera_conversion(up),
+            fov
+        )
+
+        cond_pose = self.get_cond_lmk_openpose(joints, cameras)
+        cond_pose = torch.from_numpy(cond_pose).float() / 255.0
+
+        cond_depth = self.get_cond_depth(vertices, faces, cameras)
+
+        return {
+            'pose': cond_pose,
+            'depth': cond_depth,
+        }

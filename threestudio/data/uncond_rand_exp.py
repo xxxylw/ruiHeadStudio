@@ -87,6 +87,8 @@ class RandomCameraDataModuleConfig:
     is_lmk: bool = True
     is_mediapipe: bool = True
 
+    control_type: str = "mediapipe"
+
     training_w_animation: bool = True
 
 
@@ -418,21 +420,20 @@ class RandomCameraIterableDataset(IterableDataset, Updateable):
             reye_pose = None
             neck_pose = None
 
-        flame_depths = self.skel.get_cond(
-            dist=camera_distances,
-            elev=elevation_deg,
-            azim=azimuth_deg,
-            at=center,
-            up=up,
-            fov=fovy_deg,
-            expression=expression,
-            jaw_pose=jaw_pose,
-            # leye_pose=leye_pose,
-            # reye_pose=reye_pose,
-            # neck_pose=neck_pose,
-            lmk=self.cfg.is_lmk,
-            mediapipe=self.cfg.is_mediapipe,
+        cond_kwargs = dict(
+            dist=camera_distances, elev=elevation_deg, azim=azimuth_deg,
+            at=center, up=up, fov=fovy_deg,
+            expression=expression, jaw_pose=jaw_pose,
         )
+
+        if self.cfg.control_type == "pose_depth":
+            flame_conds = self.skel.get_cond_pose_depth(**cond_kwargs)
+        else:
+            flame_conds = self.skel.get_cond(
+                **cond_kwargs,
+                lmk=self.cfg.is_lmk,
+                mediapipe=self.cfg.is_mediapipe,
+            )
 
         return {
             "mvp_mtx": mvp_mtx,
@@ -445,7 +446,7 @@ class RandomCameraIterableDataset(IterableDataset, Updateable):
             "height": self.height,
             "width": self.width,
             "fovy": fovy,
-            "flame_conds": flame_depths,
+            "flame_conds": flame_conds,
             'expression': expression,
             'jaw_pose': jaw_pose,
             'leye_pose': leye_pose,

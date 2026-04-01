@@ -1,12 +1,12 @@
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field as dataclass_field
 
 import cv2
 import numpy as np
 import torch
 import torch.nn.functional as F
 from controlnet_aux import CannyDetector, NormalBaeDetector
-from diffusers import ControlNetModel, DDIMScheduler, StableDiffusionControlNetPipeline
+from diffusers import ControlNetModel, DDIMScheduler, StableDiffusionControlNetPipeline, MultiControlNetModel
 from diffusers.utils.import_utils import is_xformers_available
 from tqdm import tqdm
 
@@ -24,7 +24,7 @@ class ControlNetGuidance(BaseObject):
         cache_dir: Optional[str] = None
         pretrained_model_name_or_path: str = "stablediffusionapi/realistic-vision-51"
         ddim_scheduler_name_or_path: str = "runwayml/stable-diffusion-v1-5"
-        control_type: str = "normal"  # normal/canny
+        control_type: str = "normal"  # normal/canny/depth/openpose/mediapipe/pose_depth
 
         enable_memory_efficient_attention: bool = False
         enable_sequential_cpu_offload: bool = False
@@ -32,6 +32,8 @@ class ControlNetGuidance(BaseObject):
         enable_channels_last_format: bool = False
         guidance_scale: float = 7.5
         condition_scale: float = 1.5
+        condition_scale_pose: float = 1.0
+        condition_scale_depth: float = 0.8
         grad_clip: Optional[
             Any
         ] = None  # field(default_factory=lambda: [0, 2.0, 8.0, 1000])
@@ -55,17 +57,7 @@ class ControlNetGuidance(BaseObject):
     def configure(self) -> None:
         threestudio.info(f"Loading ControlNet ...")
 
-        controlnet_name_or_path: str
-        if self.cfg.control_type == "normal":
-            controlnet_name_or_path = "lllyasviel/control_v11p_sd15_normalbae"
-        elif self.cfg.control_type == "canny":
-            controlnet_name_or_path = "lllyasviel/control_v11p_sd15_canny"
-        elif self.cfg.control_type == "depth":
-            controlnet_name_or_path = "lllyasviel/control_v11f1p_sd15_depth"
-        elif self.cfg.control_type == "openpose":
-            controlnet_name_or_path = "lllyasviel/control_v11p_sd15_openpose"
-        elif self.cfg.control_type == "mediapipe":
-            controlnet_name_or_path = "CrucibleAI/ControlNetMediaPipeFace"
+        self.is_multi_controlnet = (self.cfg.control_type == "pose_depth")
 
         self.weights_dtype = (
             torch.float16 if self.cfg.half_precision_weights else torch.float32
@@ -79,15 +71,48 @@ class ControlNetGuidance(BaseObject):
             "cache_dir": self.cfg.cache_dir,
         }
 
-        if self.cfg.control_type == "mediapipe":
-            if self.cfg.pretrained_model_name_or_path in ["stablediffusionapi/realistic-vision-51",
-                                                          "runwayml/stable-diffusion-v1-5"]:
-                controlnet = ControlNetModel.from_pretrained(
-                    controlnet_name_or_path,
-                    subfolder="diffusion_sd15",
-                    torch_dtype=self.weights_dtype,
-                    cache_dir=self.cfg.cache_dir,
-                )
+        if self.is_multi_controlnet:
+            controlnet_pose = ControlNetModel.from_pretrained(
+                "lllyasviel/control_v11p_sd15_openpose",
+                torch_dtype=self.weights_dtype,
+                cache_dir=self.cfg.cache_dir,
+            )
+            controlnet_depth = ControlNetModel.from_pretrained(
+                "lllyasviel/control_v11f1p_sd15_depth",
+                torch_dtype=self.weights_dtype,
+                cache_dir=self.cfg.cache_dir,
+            )
+            controlnet = [controlnet_pose, controlnet_depth]
+        else:
+            controlnet_name_or_path: str
+            if self.cfg.control_type == "normal":
+                controlnet_name_or_path = "lllyasviel/control_v11p_sd15_normalbae"
+            elif self.cfg.control_type == "canny":
+                controlnet_name_or_path = "lllyasviel/control_v11p_sd15_canny"
+            elif self.cfg.control_type == "depth":
+                controlnet_name_or_path = "lllyasviel/control_v11f1p_sd15_depth"
+            elif self.cfg.control_type == "openpose":
+                controlnet_name_or_path = "lllyasviel/control_v11p_sd15_openpose"
+            elif self.cfg.control_type == "mediapipe":
+                controlnet_name_or_path = "CrucibleAI/ControlNetMediaPipeFace"
+            else:
+                raise ValueError(f"Unknown control_type: {self.cfg.control_type}")
+
+            if self.cfg.control_type == "mediapipe":
+                if self.cfg.pretrained_model_name_or_path in ["stablediffusionapi/realistic-vision-51",
+                                                              "runwayml/stable-diffusion-v1-5"]:
+                    controlnet = ControlNetModel.from_pretrained(
+                        controlnet_name_or_path,
+                        subfolder="diffusion_sd15",
+                        torch_dtype=self.weights_dtype,
+                        cache_dir=self.cfg.cache_dir,
+                    )
+                else:
+                    controlnet = ControlNetModel.from_pretrained(
+                        controlnet_name_or_path,
+                        torch_dtype=self.weights_dtype,
+                        cache_dir=self.cfg.cache_dir,
+                    )
             else:
                 controlnet = ControlNetModel.from_pretrained(
                     controlnet_name_or_path,
@@ -95,12 +120,6 @@ class ControlNetGuidance(BaseObject):
                     cache_dir=self.cfg.cache_dir,
                 )
 
-        else:
-            controlnet = ControlNetModel.from_pretrained(
-                controlnet_name_or_path,
-                torch_dtype=self.weights_dtype,
-                cache_dir=self.cfg.cache_dir,
-            )
         self.pipe = StableDiffusionControlNetPipeline.from_pretrained(
             self.cfg.pretrained_model_name_or_path, controlnet=controlnet, **pipe_kwargs
         ).to(self.device)
@@ -133,10 +152,14 @@ class ControlNetGuidance(BaseObject):
         if self.cfg.enable_channels_last_format:
             self.pipe.unet.to(memory_format=torch.channels_last)
 
-        # Create model
         self.vae = self.pipe.vae.eval()
         self.unet = self.pipe.unet.eval()
-        self.controlnet = self.pipe.controlnet.eval()
+        self.controlnet = self.pipe.controlnet
+        if self.is_multi_controlnet:
+            for net in self.controlnet.nets:
+                net.eval()
+        else:
+            self.controlnet.eval()
 
         if self.cfg.control_type == "normal":
             self.preprocessor = NormalBaeDetector.from_pretrained(
@@ -172,15 +195,19 @@ class ControlNetGuidance(BaseObject):
             self,
             latents: Float[Tensor, "..."],
             t: Float[Tensor, "..."],
-            image_cond: Float[Tensor, "..."],
-            condition_scale: float,
+            image_cond,
+            condition_scale,
             encoder_hidden_states: Float[Tensor, "..."],
     ) -> Float[Tensor, "..."]:
+        if self.is_multi_controlnet:
+            cond_input = [img.to(self.weights_dtype) for img in image_cond]
+        else:
+            cond_input = image_cond.to(self.weights_dtype)
         return self.controlnet(
             latents.to(self.weights_dtype),
             t.to(self.weights_dtype),
             encoder_hidden_states=encoder_hidden_states.to(self.weights_dtype),
-            controlnet_cond=image_cond.to(self.weights_dtype),
+            controlnet_cond=cond_input,
             conditioning_scale=condition_scale,
             return_dict=False,
         )
@@ -247,23 +274,17 @@ class ControlNetGuidance(BaseObject):
             self,
             text_embeddings: Float[Tensor, "BB 77 768"],
             latents: Float[Tensor, "B 4 64 64"],
-            image_cond: Float[Tensor, "B 3 512 512"],
+            image_cond,
             t: Int[Tensor, "B"],
     ) -> Float[Tensor, "B 4 64 64"]:
-        # self.scheduler.config.num_train_timesteps = t.item()
         self.scheduler.config.num_train_timesteps = 1000
         self.scheduler.set_timesteps(self.cfg.diffusion_steps)
         with torch.no_grad():
-            # add noise
             noise = torch.randn_like(latents)
             latents = self.scheduler.add_noise(latents, noise, t)  # type: ignore
-            image_cond_input = torch.cat([image_cond] * 2)
-            # sections of code used from https://github.com/huggingface/diffusers/blob/main/src/diffusers/pipelines/stable_diffusion/pipeline_stable_diffusion_instruct_pix2pix.py
-            # threestudio.debug("Start editing...")
+            image_cond_input = self._prepare_cond_input(image_cond, repeat=2)
             for i, t in enumerate(self.scheduler.timesteps):
-                # predict the noise residual with unet, NO grad!
                 with torch.no_grad():
-                    # pred noise
                     latent_model_input = torch.cat([latents] * 2)
                     (
                         down_block_res_samples,
@@ -273,7 +294,7 @@ class ControlNetGuidance(BaseObject):
                         t,
                         encoder_hidden_states=text_embeddings,
                         image_cond=image_cond_input,
-                        condition_scale=self.cfg.condition_scale,
+                        condition_scale=self._get_condition_scale(),
                     )
 
                     noise_pred = self.forward_control_unet(
@@ -284,36 +305,43 @@ class ControlNetGuidance(BaseObject):
                         down_block_additional_residuals=down_block_res_samples,
                         mid_block_additional_residual=mid_block_res_sample,
                     )
-                # perform classifier-free guidance
                 noise_pred_text, noise_pred_uncond = noise_pred.chunk(2)
                 noise_pred = noise_pred_uncond + self.cfg.guidance_scale * (
                         noise_pred_text - noise_pred_uncond
                 )
-                # get previous sample, continue loop
                 latents = self.scheduler.step(noise_pred, t, latents).prev_sample
-            # threestudio.debug("Editing finished.")
         return latents
+
+    def _prepare_cond_input(self, image_cond, repeat=3):
+        if self.is_multi_controlnet:
+            return [torch.cat([img] * repeat) for img in image_cond]
+        else:
+            return torch.cat([image_cond] * repeat)
+
+    def _get_condition_scale(self):
+        if self.is_multi_controlnet:
+            return [self.cfg.condition_scale_pose, self.cfg.condition_scale_depth]
+        else:
+            return self.cfg.condition_scale
 
     def compute_grad_sds(
             self,
             text_embeddings: Float[Tensor, "BB 77 768"],
             latents: Float[Tensor, "B 4 64 64"],
-            image_cond: Float[Tensor, "B 3 512 512"],
+            image_cond,
             t: Int[Tensor, "B"],
     ):
         with torch.no_grad():
-            # add noise
-            noise = torch.randn_like(latents)  # TODO: use torch generator
+            noise = torch.randn_like(latents)
             latents_noisy = self.scheduler.add_noise(latents, noise, t)
-            # pred noise
             latent_model_input = torch.cat([latents_noisy] * 3)
-            image_cond_input = torch.cat([image_cond] * 3)
+            image_cond_input = self._prepare_cond_input(image_cond, repeat=3)
             down_block_res_samples, mid_block_res_sample = self.forward_controlnet(
                 latent_model_input,
                 torch.cat([t] * 3),
                 encoder_hidden_states=text_embeddings,
                 image_cond=image_cond_input,
-                condition_scale=self.cfg.condition_scale,
+                condition_scale=self._get_condition_scale(),
             )
 
             noise_pred = self.forward_control_unet(
@@ -325,7 +353,6 @@ class ControlNetGuidance(BaseObject):
                 mid_block_additional_residual=mid_block_res_sample,
             )
 
-        # perform classifier-free guidance
         noise_pred_text, noise_pred_neg, noise_pred_null = noise_pred.chunk(3)
         noise_pred = noise_pred_null + self.cfg.guidance_scale * (
                 noise_pred_text - noise_pred_null
@@ -338,23 +365,21 @@ class ControlNetGuidance(BaseObject):
             self,
             text_embeddings: Float[Tensor, "BB 77 768"],
             latents: Float[Tensor, "B 4 64 64"],
-            image_cond: Float[Tensor, "B 3 512 512"],
+            image_cond,
             t: Int[Tensor, "B"],
     ):
         batch_size = latents.shape[0]
         with torch.no_grad():
-            # add noise
-            noise = torch.randn_like(latents)  # TODO: use torch generator
+            noise = torch.randn_like(latents)
             latents_noisy = self.scheduler.add_noise(latents, noise, t)
-            # pred noise
             latent_model_input = torch.cat([latents_noisy] * 3)
-            image_cond_input = torch.cat([image_cond] * 3)
+            image_cond_input = self._prepare_cond_input(image_cond, repeat=3)
             down_block_res_samples, mid_block_res_sample = self.forward_controlnet(
                 latent_model_input,
                 torch.cat([t] * 3),
                 encoder_hidden_states=text_embeddings,
                 image_cond=image_cond_input,
-                condition_scale=self.cfg.condition_scale,
+                condition_scale=self._get_condition_scale(),
             )
 
             noise_pred = self.forward_control_unet(
@@ -366,19 +391,13 @@ class ControlNetGuidance(BaseObject):
                 mid_block_additional_residual=mid_block_res_sample,
             )
 
-        # perform classifier-free guidance
         noise_pred_text, noise_pred_neg, noise_pred_null = noise_pred.chunk(3)
-        # Eq.6 in Noise-free Score Distillation, Katzir et al., arXiv preprint arXiv:2310.17590, 2023.
         delta_c = self.cfg.guidance_scale * (noise_pred_text - noise_pred_null)
         mask = (t < 200).int().view(batch_size, 1, 1, 1)
         if self.cfg.use_dsd:
             delta_d = mask * noise_pred_null + (1 - mask) * (noise_pred_null + (noise_pred_null - noise_pred_neg))
         else:
             delta_d = mask * noise_pred_null + (1 - mask) * (noise_pred_null - noise_pred_neg)
-
-        # noise_pred = noise_pred_text + self.cfg.guidance_scale * (
-        #     noise_pred_text - noise_pred_uncond
-        # )
 
         w = (1 - self.alphas[t]).view(-1, 1, 1, 1)
         grad = w * (delta_c + delta_d)
@@ -387,7 +406,7 @@ class ControlNetGuidance(BaseObject):
     def __call__(
             self,
             rgb: Float[Tensor, "B H W C"],
-            control_image: Float[Tensor, "B H W C"],
+            control_image,
             prompt_utils: PromptProcessorOutput,
             elevation: Float[Tensor, "B"],
             azimuth: Float[Tensor, "B"],
@@ -396,7 +415,6 @@ class ControlNetGuidance(BaseObject):
             **kwargs,
     ):
         batch_size = rgb.shape[0]
-        # assert batch_size == 1
 
         rgb_BCHW = rgb
         latents: Float[Tensor, "B 4 64 64"]
@@ -408,21 +426,21 @@ class ControlNetGuidance(BaseObject):
             rgb_BCHW_512 = F.interpolate(
                 rgb_BCHW, (512, 512), mode="bilinear", align_corners=False
             )
-            # encode image into latents with vae
             latents = self.encode_images(rgb_BCHW_512)
 
-        # image_cond = control_image
-        image_cond = F.interpolate(
-            control_image, (512, 512), mode="bilinear", align_corners=False
-        )
+        if self.is_multi_controlnet:
+            image_cond = [
+                F.interpolate(img, (512, 512), mode="bilinear", align_corners=False)
+                for img in control_image
+            ]
+        else:
+            image_cond = F.interpolate(
+                control_image, (512, 512), mode="bilinear", align_corners=False
+            )
 
-        # temp = torch.zeros(batch_size).to(rgb.device)
-        # text_embeddings = prompt_utils.get_text_embeddings(temp, temp, temp, False)
         text_embeddings = prompt_utils.get_text_embeddings(
             elevation, azimuth, camera_distances, True
         )
-        # text_embeddings = text_embeddings[:batch_size * 2]
-        # timestep ~ U(0.02, 0.98) to avoid very high/low noise level
         t = torch.randint(
             self.min_step,
             self.max_step + 1,

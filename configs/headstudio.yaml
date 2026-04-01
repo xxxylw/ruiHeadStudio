@@ -17,6 +17,7 @@ data:
   elevation_range: [ -30, 30 ]
   is_lmk: True
   is_mediapipe: True
+  control_type: "pose_depth"
 
   enable_near_head_poses: true
   head_offset: 0.65
@@ -68,7 +69,9 @@ system:
   guidance_type: "controlnet-depth-guidance"
   guidance:
     pretrained_model_name_or_path: "stablediffusionapi/realistic-vision-51"
-    control_type: "mediapipe" # depth
+    control_type: "pose_depth"
+    condition_scale_pose: 1.0
+    condition_scale_depth: 0.8
     min_step_percent: 0.05
     max_step_percent: 0.8
     use_nfsd: False
