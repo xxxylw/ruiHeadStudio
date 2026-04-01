@@ -1,0 +1,127 @@
+好的，训练确实就是用 `launch.py` 启动的，但在跑之前需要确保几个前置条件都满足。下面是完整的步骤：
+
+---
+
+## 一、环境安装（首次需要）
+
+**1. 创建 conda 环境**
+```bash
+conda create -n headstudio python=3.9
+conda activate headstudio
+```
+
+**2. 安装 PyTorch（CUDA 11.8）**
+```bash
+pip install torch==2.0.1+cu118 torchvision==0.15.2+cu118 torchaudio==2.0.2 --index-url https://download.pytorch.org/whl/cu118
+```
+
+**3. 安装 conda 额外包**
+```bash
+bash packages.sh
+```
+
+**4. 安装 pip 依赖**
+```bash
+pip install -r requirements.txt
+```
+
+**5. 安装 diff-gaussian-rasterization**
+```bash
+git clone --recursive https://github.com/ashawkey/diff-gaussian-rasterization
+pip install ./diff-gaussian-rasterization
+```
+
+---
+
+## 二、准备数据和权重
+
+**1. FLAME 模型**：去 https://flame.is.tue.mpg.de 注册下载 `FLAME 2020`，放到 `./ckpts/FLAME-2000/` 下：
+```
+ckpts/FLAME-2000/
+  ├── FLAME_FEMALE.pkl
+  ├── FLAME_GENERIC.pkl
+  ├── FLAME_MAKE.pkl
+  ├── flame_static_embeddings.pkl
+  └── flame_dynamic_embeddings.pkl
+```
+
+**2. MediaPipe 相关文件**（原有条件需要的，现在虽然换了 Pose+Depth，但部分代码路径可能仍需要）：
+```
+ckpts/ControlNet-Mediapipe/
+  ├── flame2facemsh.npy
+  └── mediapipe_landmark_embedding.npz
+```
+
+**3. TalkShow 训练数据**：config 里指定了两个路径，确保它们存在：
+
+```6:7:d:\of_work\code\ruiHeadStudio\configs\headstudio.yaml
+  talkshow_train_path: './talkshow/collection/chemistry_exp.npy'
+  talkshow_val_path: './talkshow/ExpressiveWholeBodyDatasetReleaseV1.0/chemistry/2nd_Order_Rate_Laws-6BZb96mqmbg.mp4/68891-00_01_40-00_01_46/68891-00_01_40-00_01_46.pkl'
+```
+
+原项目提供了百度网盘下载链接（见 README），把这些文件下载好放到对应位置。
+
+**4. 新 ControlNet 权重（自动下载）**：我们改的代码会从 HuggingFace 自动下载以下两个 ControlNet：
+- `lllyasviel/control_v11p_sd15_openpose`（Pose）
+- `lllyasviel/control_v11f1p_sd15_depth`（Depth）
+
+以及 SD1.5 基础模型 `stablediffusionapi/realistic-vision-51`。**首次运行会自动下载**，确保网络畅通（或提前配好 HuggingFace 镜像/代理）。
+
+---
+
+## 三、启动训练
+
+训练命令的基本格式：
+
+```bash
+python launch.py --config configs/headstudio.yaml --train system.prompt_processor.prompt='你的文本提示'
+```
+
+参考 `scripts/headstudio.sh` 中的示例，典型的完整命令如下：
+
+```bash
+python launch.py --config configs/headstudio.yaml --train \
+  system.prompt_processor.prompt="a DSLR portrait of Joker in DC, masterpiece, Studio Quality, 8k, ultra-HD, next generation" \
+  system.guidance.use_nfsd=True \
+  system.max_grad=0.001 \
+  system.area_relax=True
+```
+
+如果要指定 GPU，在 Windows 上用：
+```bash
+set CUDA_VISIBLE_DEVICES=0
+python launch.py --config configs/headstudio.yaml --train system.prompt_processor.prompt="a DSLR portrait of Joker in DC, masterpiece, Studio Quality, 8k, ultra-HD, next generation" system.guidance.use_nfsd=True system.max_grad=0.001 system.area_relax=True
+```
+
+---
+
+## 四、关键参数说明
+
+| 参数 | 说明 | 默认值 |
+|------|------|--------|
+| `system.prompt_processor.prompt` | 文本描述，决定生成的头像长什么样 | config 中有默认 |
+| `system.guidance.use_nfsd` | 是否使用 NFSD loss（推荐开） | False |
+| `system.max_grad` | 梯度裁剪阈值 | 0.002 |
+| `system.area_relax` | 区域松弛（推荐开） | False |
+| `trainer.max_steps` | 最大训练步数 | 10000 |
+| `system.guidance.condition_scale_pose` | Pose ControlNet 强度 | 1.0 |
+| `system.guidance.condition_scale_depth` | Depth ControlNet 强度 | 0.8 |
+
+---
+
+## 五、训练输出
+
+- 训练日志和输出保存在 `./outputs/headstudio/` 目录下
+- 每 100 步会做一次 validation（`val_check_interval: 100`）
+- 最终会保存 checkpoint 和渲染的验证视频
+- 默认训练 **10000 步**，根据 GPU 不同大概需要几个小时
+
+---
+
+## 六、注意事项
+
+1. **显存需求**：batch_size 为 8，渲染分辨率 1024x1024，加上双 ControlNet，显存占用会比较大。如果显存不够，可以在命令行覆盖：`data.batch_size=4` 或 `data.height=512 data.width=512`
+2. **Windows 兼容性**：项目原本是 Linux 开发的，部分 CUDA 编译（如 `simple-knn`、`diff-gaussian-rasterization`、`tiny-cuda-nn`）在 Windows 上可能需要 Visual Studio Build Tools。确保安装了 VS2019/2022 的 C++ 编译工具
+3. **首次下载模型会比较慢**：SD1.5 + 两个 ControlNet 加起来大约 10GB+，建议提前通过 `huggingface-cli download` 或者设置 `HF_ENDPOINT` 镜像来加速
+
+总结：**环境装好、数据放好，直接一行 `python launch.py --config configs/headstudio.yaml --train system.prompt_processor.prompt="你的描述"` 就能跑起来了。**
