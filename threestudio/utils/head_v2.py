@@ -347,7 +347,7 @@ class FlamePointswRandomExp:
             colors = cmap(norm(area_faces))
 
             colors = torch.from_numpy(colors[:, :3]).to(self.device)  # [M, 3]
-            colors = colors[None, :, None, None, :]
+            colors = colors[None, :, None, None, :].expand(self.batch_size, -1, -1, -1, -1).contiguous()
             textures = TexturesAtlas(atlas=colors)
 
         # verts_rgb = torch.ones(vertices.shape, device=self.device)

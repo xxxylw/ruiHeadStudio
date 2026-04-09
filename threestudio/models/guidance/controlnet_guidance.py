@@ -6,7 +6,8 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 from controlnet_aux import CannyDetector, NormalBaeDetector
-from diffusers import ControlNetModel, DDIMScheduler, StableDiffusionControlNetPipeline, MultiControlNetModel
+from diffusers import ControlNetModel, DDIMScheduler, StableDiffusionControlNetPipeline
+from diffusers.pipelines.controlnet import MultiControlNetModel
 from diffusers.utils.import_utils import is_xformers_available
 from tqdm import tqdm
 
