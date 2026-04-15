@@ -1,0 +1,38 @@
+# Exact snapshot exported from the local conda env `ruiheadstudio` on 2026-04-15.
+# Use this file as a reference/lock snapshot, not as the primary setup guide.
+#
+# Command:
+#   conda list -n ruiheadstudio
+#
+# Key packages from the current environment:
+python==3.9.23
+torch==2.0.1+cu118
+torchvision==0.15.2+cu118
+torchaudio==2.0.2+cu118
+pytorch-lightning==2.3.3
+lightning==2.3.3
+pytorch3d==0.7.7
+xformers==0.0.22.post7
+diffusers==0.21.4
+transformers==4.34.0
+accelerate==0.21.0
+mediapipe==0.10.14
+moviepy==2.2.1
+opencv-python==4.12.0.88
+opencv-contrib-python==4.12.0.88
+nerfacc==0.5.2
+nvdiffrast==0.4.0
+simple-knn==0.0.0
+diff-gaussian-rasterization==0.0.0
+tinycudann==2.0
+numpy==1.23.5
+scipy==1.13.1
+matplotlib==3.9.4
+seaborn==0.13.2
+gradio==3.36.1
+wandb==0.24.0
+
+# Notes:
+# - The live environment also contains many unrelated utilities and personal tools.
+# - Prefer `environment.yml` for rebuilding the project environment.
+# - Keep this file around as an "it worked on this machine" snapshot.

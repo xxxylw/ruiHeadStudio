@@ -1,0 +1,24 @@
+name: ruiheadstudio
+channels:
+  - pytorch
+  - nvidia
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.9
+  - pip
+  - git
+  - git-lfs
+  - cmake
+  - ninja
+  - ffmpeg
+  - c-compiler
+  - cxx-compiler
+  - cuda-toolkit=11.8
+  - pytorch=2.0.1
+  - torchvision=0.15.2
+  - torchaudio=2.0.2
+  - pytorch-cuda=11.8
+  - pip:
+      - -r requirements.server.txt
+      - ./gaussiansplatting/submodules/simple-knn
