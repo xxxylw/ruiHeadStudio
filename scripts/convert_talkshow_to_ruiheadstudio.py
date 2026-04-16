@@ -1,9 +1,11 @@
 import argparse
+import io
 import pickle
 from pathlib import Path
 from typing import Dict, Iterable, List
 
 import numpy as np
+import torch
 
 
 REQUIRED_KEYS = (
@@ -13,6 +15,17 @@ REQUIRED_KEYS = (
     "reye_pose",
     "body_pose_axis",
 )
+
+
+def torch_load_cpu(bytes_obj):
+    return torch.load(io.BytesIO(bytes_obj), map_location="cpu")
+
+
+class CPUCompatibleUnpickler(pickle.Unpickler):
+    def find_class(self, module, name):
+        if module == "torch.storage" and name == "_load_from_bytes":
+            return torch_load_cpu
+        return super().find_class(module, name)
 
 
 def parse_args() -> argparse.Namespace:
@@ -114,7 +127,7 @@ def convert_sequence(data: Dict, source_path: Path) -> Dict[str, np.ndarray]:
 
 def load_sequence(path: Path, strict: bool) -> Dict[str, np.ndarray]:
     with path.open("rb") as f:
-        data = pickle.load(f)
+        data = CPUCompatibleUnpickler(f).load()
     if not isinstance(data, dict):
         raise TypeError(f"{path} did not deserialize to dict, got {type(data).__name__}.")
     try:
