@@ -1,22 +1,20 @@
 import argparse
 import csv
-import json
 import os
+import json
 import tempfile
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Sequence, Tuple
+from typing import Dict, List, Optional, Sequence, Tuple
 
 os.environ.setdefault("MPLCONFIGDIR", tempfile.mkdtemp(prefix="matplotlib-"))
 
 import matplotlib.pyplot as plt
 import numpy as np
-import numba
-
-
-_original_numba_njit = numba.njit
-_original_numba_jit = numba.jit
-_original_numba_vectorize = numba.vectorize
-_original_numba_guvectorize = numba.guvectorize
+try:
+    import numba
+except ImportError:  # pragma: no cover - handled at runtime
+    numba = None
 
 
 def _strip_cache_kwargs(kwargs):
@@ -46,10 +44,16 @@ def _guvectorize_without_cache(*args, **kwargs):
     return _original_numba_guvectorize(*args, **kwargs)
 
 
-numba.njit = _njit_without_cache
-numba.jit = _jit_without_cache
-numba.vectorize = _vectorize_without_cache
-numba.guvectorize = _guvectorize_without_cache
+if numba is not None:
+    _original_numba_njit = numba.njit
+    _original_numba_jit = numba.jit
+    _original_numba_vectorize = numba.vectorize
+    _original_numba_guvectorize = numba.guvectorize
+
+    numba.njit = _njit_without_cache
+    numba.jit = _jit_without_cache
+    numba.vectorize = _vectorize_without_cache
+    numba.guvectorize = _guvectorize_without_cache
 
 try:
     import umap
@@ -65,6 +69,13 @@ except ImportError:  # pragma: no cover - handled at runtime
 POSE_KEYS = ("expression", "jaw_pose", "leye_pose", "reye_pose", "neck_pose")
 
 
+@dataclass(frozen=True)
+class InputSpec:
+    input_path: Path
+    group_label: str
+    input_name: str
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
@@ -73,8 +84,18 @@ def parse_args() -> argparse.Namespace:
         )
     )
     parser.add_argument(
-        "input",
-        help="Path to a RuiHeadStudio pose collection .npy file.",
+        "inputs",
+        nargs="+",
+        help="One or more RuiHeadStudio pose collection .npy files or directories containing .npy files.",
+    )
+    parser.add_argument(
+        "--group-label",
+        nargs="*",
+        default=None,
+        help=(
+            "Optional labels for the top-level inputs. The count must match the number of positional "
+            "inputs. Directory inputs apply their group label to every .npy file inside."
+        ),
     )
     parser.add_argument(
         "--output-dir",
@@ -86,6 +107,18 @@ def parse_args() -> argparse.Namespace:
         choices=("frame", "sequence"),
         default="frame",
         help="Use frame-level or sequence-level features to build the UMAP/HDBSCAN plots.",
+    )
+    parser.add_argument(
+        "--sampler-mode",
+        choices=("all_frames", "train_like"),
+        default="all_frames",
+        help="Frame sampling mode. train_like matches training by sampling sequence first, then frame.",
+    )
+    parser.add_argument(
+        "--samples-per-input",
+        type=int,
+        default=None,
+        help="When sampler-mode=train_like, draw this many samples per group label. Defaults to max_points // num_groups.",
     )
     parser.add_argument(
         "--max-points",
@@ -147,13 +180,36 @@ def load_collection(path: Path):
     return list(collection.tolist())
 
 
-def infer_sequence_metadata(input_path: Path, sequence: Dict, sequence_index: int) -> Dict[str, str]:
+def expand_input_specs(input_paths: Sequence[Path], group_labels: Optional[Sequence[str]] = None) -> List[InputSpec]:
+    normalized_paths = [Path(path) for path in input_paths]
+    if group_labels is not None and len(group_labels) != len(normalized_paths):
+        raise ValueError(
+            f"group_labels length ({len(group_labels)}) must match inputs length ({len(normalized_paths)})"
+        )
+
+    specs: List[InputSpec] = []
+    for index, input_path in enumerate(normalized_paths):
+        group_label = group_labels[index] if group_labels is not None else input_path.stem
+        if input_path.is_dir():
+            children = sorted(child for child in input_path.glob("*.npy") if child.is_file())
+            if not children:
+                raise FileNotFoundError(f"No .npy files found in directory: {input_path}")
+            for child in children:
+                specs.append(InputSpec(input_path=child, group_label=group_label, input_name=child.stem))
+        elif input_path.is_file():
+            specs.append(InputSpec(input_path=input_path, group_label=group_label, input_name=input_path.stem))
+        else:
+            raise FileNotFoundError(input_path)
+    return specs
+
+
+def infer_sequence_metadata(input_spec: InputSpec, sequence: Dict, sequence_index: int) -> Dict[str, str]:
     source_path = sequence.get("source_path", "")
     source_file = sequence.get("source_file", "")
     video_name = sequence.get("video_name")
     clip_name = sequence.get("clip_name")
 
-    stem = input_path.stem
+    stem = input_spec.input_path.stem
     if "__" in stem:
         stem_video, stem_clip = stem.split("__", 1)
     else:
@@ -167,7 +223,11 @@ def infer_sequence_metadata(input_path: Path, sequence: Dict, sequence_index: in
 
     source_name = f"{video_name}__{clip_name}"
     return {
+        "input_path": str(input_spec.input_path),
+        "input_name": input_spec.input_name,
+        "group_label": input_spec.group_label,
         "sequence_index": str(sequence_index),
+        "sequence_key": f"{input_spec.input_name}::seq_{sequence_index:05d}",
         "source_name": source_name,
         "video_name": video_name,
         "clip_name": clip_name,
@@ -218,37 +278,39 @@ def sequence_statistics(frame_features: np.ndarray) -> np.ndarray:
 
 
 def build_feature_tables(
-    sequences: Sequence[Dict], input_path: Path
+    input_specs: Sequence[InputSpec],
 ) -> Tuple[np.ndarray, List[Dict[str, str]], np.ndarray, List[Dict[str, str]]]:
     frame_feature_list: List[np.ndarray] = []
     frame_metadata: List[Dict[str, str]] = []
     sequence_feature_list: List[np.ndarray] = []
     sequence_metadata: List[Dict[str, str]] = []
 
-    for sequence_index, sequence in enumerate(sequences):
-        for key in POSE_KEYS:
-            if key not in sequence:
-                raise KeyError(f"Sequence {sequence_index} is missing key '{key}'")
+    for input_spec in input_specs:
+        sequences = load_collection(input_spec.input_path)
+        for sequence_index, sequence in enumerate(sequences):
+            for key in POSE_KEYS:
+                if key not in sequence:
+                    raise KeyError(f"Sequence {sequence_index} in {input_spec.input_path} is missing key '{key}'")
 
-        sequence_info = infer_sequence_metadata(input_path, sequence, sequence_index)
-        frame_features = stack_frame_features(sequence)
-        frame_feature_list.append(frame_features)
-        sequence_feature_list.append(sequence_statistics(frame_features))
+            sequence_info = infer_sequence_metadata(input_spec, sequence, sequence_index)
+            frame_features = stack_frame_features(sequence)
+            frame_feature_list.append(frame_features)
+            sequence_feature_list.append(sequence_statistics(frame_features))
 
-        sequence_metadata.append(
-            {
-                **sequence_info,
-                "num_frames": str(frame_features.shape[0]),
-            }
-        )
-
-        for frame_index in range(frame_features.shape[0]):
-            frame_metadata.append(
+            sequence_metadata.append(
                 {
                     **sequence_info,
-                    "frame_index": str(frame_index),
+                    "num_frames": str(frame_features.shape[0]),
                 }
             )
+
+            for frame_index in range(frame_features.shape[0]):
+                frame_metadata.append(
+                    {
+                        **sequence_info,
+                        "frame_index": str(frame_index),
+                    }
+                )
 
     frame_feature_matrix = np.concatenate(frame_feature_list, axis=0).astype(np.float32)
     sequence_feature_matrix = np.stack(sequence_feature_list, axis=0).astype(np.float32)
@@ -279,6 +341,35 @@ def sample_indices(num_points: int, max_points: int, random_seed: int) -> np.nda
     return indices.astype(np.int64)
 
 
+def sample_train_like_indices(
+    frame_metadata: Sequence[Dict[str, str]],
+    samples_per_input: int,
+    random_seed: int,
+) -> np.ndarray:
+    if samples_per_input <= 0:
+        raise ValueError("samples_per_input must be a positive integer")
+
+    by_input: Dict[str, Dict[str, List[int]]] = {}
+    for row_index, row in enumerate(frame_metadata):
+        input_name = row["group_label"]
+        sequence_key = row["sequence_key"]
+        by_input.setdefault(input_name, {}).setdefault(sequence_key, []).append(row_index)
+
+    if not by_input:
+        raise ValueError("No frame metadata available for train_like sampling")
+
+    rng = np.random.default_rng(random_seed)
+    sampled_indices: List[int] = []
+    for input_name in sorted(by_input):
+        sequence_map = by_input[input_name]
+        sequence_keys = sorted(sequence_map)
+        for _ in range(samples_per_input):
+            chosen_sequence = sequence_keys[int(rng.integers(len(sequence_keys)))]
+            frame_indices = sequence_map[chosen_sequence]
+            sampled_indices.append(frame_indices[int(rng.integers(len(frame_indices)))])
+    return np.asarray(sampled_indices, dtype=np.int64)
+
+
 def run_embedding(features: np.ndarray, args: argparse.Namespace) -> np.ndarray:
     reducer = umap.UMAP(
         n_components=2,
@@ -307,15 +398,21 @@ def make_palette(num_colors: int) -> List[Tuple[float, float, float, float]]:
     return [cmap(i % cmap.N) for i in range(num_colors)]
 
 
-def plot_by_source(embedding: np.ndarray, metadata: List[Dict[str, str]], path: Path) -> None:
-    source_names = [row["source_name"] for row in metadata]
-    unique_sources = list(dict.fromkeys(source_names))
-    palette = make_palette(len(unique_sources))
-    color_map = {name: palette[i] for i, name in enumerate(unique_sources)}
+def plot_by_category(
+    embedding: np.ndarray,
+    metadata: List[Dict[str, str]],
+    category_key: str,
+    title: str,
+    path: Path,
+) -> None:
+    values = [row[category_key] for row in metadata]
+    unique_values = list(dict.fromkeys(values))
+    palette = make_palette(len(unique_values))
+    color_map = {name: palette[i] for i, name in enumerate(unique_values)}
 
     fig, ax = plt.subplots(figsize=(10, 8), dpi=180)
-    for name in unique_sources:
-        idx = np.array([i for i, value in enumerate(source_names) if value == name], dtype=np.int64)
+    for name in unique_values:
+        idx = np.array([i for i, value in enumerate(values) if value == name], dtype=np.int64)
         ax.scatter(
             embedding[idx, 0],
             embedding[idx, 1],
@@ -325,7 +422,7 @@ def plot_by_source(embedding: np.ndarray, metadata: List[Dict[str, str]], path: 
             color=color_map[name],
             edgecolors="none",
         )
-    ax.set_title("UMAP of Pose Distribution by Source")
+    ax.set_title(title)
     ax.set_xlabel("UMAP-1")
     ax.set_ylabel("UMAP-2")
     ax.legend(loc="upper left", bbox_to_anchor=(1.02, 1.0), frameon=False, markerscale=2)
@@ -367,6 +464,7 @@ def plot_by_cluster(embedding: np.ndarray, labels: np.ndarray, path: Path) -> No
 def write_summary(
     path: Path,
     args: argparse.Namespace,
+    input_specs: Sequence[InputSpec],
     frame_features: np.ndarray,
     frame_metadata: List[Dict[str, str]],
     sequence_features: np.ndarray,
@@ -376,21 +474,45 @@ def write_summary(
 ) -> None:
     source_names = [row["source_name"] for row in frame_metadata]
     unique_sources = sorted(set(source_names))
+    group_counts: Dict[str, int] = {}
+    input_counts: Dict[str, int] = {}
+    for row in frame_metadata:
+        group_counts[row["group_label"]] = group_counts.get(row["group_label"], 0) + 1
+        input_counts[row["input_name"]] = input_counts.get(row["input_name"], 0) + 1
+
+    sampled_group_counts: Dict[str, int] = {}
+    for row_index in sampled_indices.tolist():
+        row = frame_metadata[row_index] if args.embedding_level == "frame" else sequence_metadata[row_index]
+        sampled_group_counts[row["group_label"]] = sampled_group_counts.get(row["group_label"], 0) + 1
+
     unique_labels, counts = np.unique(labels, return_counts=True)
     cluster_counts = {}
     for label, count in zip(unique_labels.tolist(), counts.tolist()):
         cluster_counts["noise" if label == -1 else f"cluster_{label}"] = count
 
     summary = {
-        "input_path": args.input,
+        "inputs": [str(path) for path in args.inputs],
+        "expanded_inputs": [
+            {
+                "input_path": str(spec.input_path),
+                "input_name": spec.input_name,
+                "group_label": spec.group_label,
+            }
+            for spec in input_specs
+        ],
         "embedding_level": args.embedding_level,
+        "sampler_mode": args.sampler_mode,
+        "samples_per_input": args.samples_per_input,
         "num_sequences": int(sequence_features.shape[0]),
         "num_frames": int(frame_features.shape[0]),
         "frame_feature_dim": int(frame_features.shape[1]),
         "sequence_feature_dim": int(sequence_features.shape[1]),
         "num_sources": int(len(unique_sources)),
         "sources": unique_sources,
+        "group_counts": group_counts,
+        "input_counts": input_counts,
         "sampled_points": int(sampled_indices.shape[0]),
+        "sampled_group_counts": sampled_group_counts,
         "cluster_counts": cluster_counts,
     }
     with path.open("w", encoding="utf-8") as f:
@@ -401,21 +523,21 @@ def main() -> None:
     args = parse_args()
     require_packages()
 
-    input_path = Path(args.input)
-    if not input_path.exists():
-        raise FileNotFoundError(input_path)
+    input_paths = [Path(path) for path in args.inputs]
+    input_specs = expand_input_specs(input_paths, args.group_label)
 
     if args.output_dir is None:
-        output_dir = input_path.with_suffix("")
-        output_dir = output_dir.parent / f"{output_dir.name}_distribution"
+        if len(input_paths) == 1:
+            output_dir = input_paths[0].with_suffix("")
+            output_dir = output_dir.parent / f"{output_dir.name}_distribution"
+        else:
+            common_parent = Path(os.path.commonpath([str(path.resolve().parent) for path in input_paths]))
+            output_dir = common_parent / "multi_input_pose_distribution"
     else:
         output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    sequences = load_collection(input_path)
-    frame_features, frame_metadata, sequence_features, sequence_metadata = build_feature_tables(
-        sequences, input_path
-    )
+    frame_features, frame_metadata, sequence_features, sequence_metadata = build_feature_tables(input_specs)
 
     np.save(output_dir / "frame_features.npy", frame_features)
     write_csv(output_dir / "frame_metadata.csv", frame_metadata)
@@ -425,11 +547,20 @@ def main() -> None:
     if args.embedding_level == "frame":
         base_features = frame_features
         base_metadata = frame_metadata
+        if args.sampler_mode == "all_frames":
+            sampled_indices = sample_indices(base_features.shape[0], args.max_points, args.random_seed)
+        else:
+            samples_per_input = args.samples_per_input
+            if samples_per_input is None:
+                group_count = max(1, len({spec.group_label for spec in input_specs}))
+                samples_per_input = max(1, args.max_points // group_count)
+            sampled_indices = sample_train_like_indices(frame_metadata, samples_per_input, args.random_seed)
     else:
+        if args.sampler_mode != "all_frames":
+            raise ValueError("sampler_mode=train_like is only supported for frame-level embeddings")
         base_features = sequence_features
         base_metadata = sequence_metadata
-
-    sampled_indices = sample_indices(base_features.shape[0], args.max_points, args.random_seed)
+        sampled_indices = sample_indices(base_features.shape[0], args.max_points, args.random_seed)
     sampled_features = standardize_features(base_features[sampled_indices])
     sampled_metadata = [base_metadata[i] for i in sampled_indices.tolist()]
 
@@ -440,11 +571,25 @@ def main() -> None:
     np.save(output_dir / f"{args.embedding_level}_hdbscan_labels.npy", labels)
     np.save(output_dir / f"{args.embedding_level}_sample_indices.npy", sampled_indices)
 
-    plot_by_source(embedding, sampled_metadata, output_dir / f"umap_{args.embedding_level}_by_source.png")
+    plot_by_category(
+        embedding,
+        sampled_metadata,
+        "source_name",
+        "UMAP of Pose Distribution by Source",
+        output_dir / f"umap_{args.embedding_level}_by_source.png",
+    )
+    plot_by_category(
+        embedding,
+        sampled_metadata,
+        "group_label",
+        "UMAP of Pose Distribution by Group",
+        output_dir / f"umap_{args.embedding_level}_by_group.png",
+    )
     plot_by_cluster(embedding, labels, output_dir / f"umap_{args.embedding_level}_by_cluster.png")
     write_summary(
         output_dir / "summary.json",
         args,
+        input_specs,
         frame_features,
         frame_metadata,
         sequence_features,
@@ -456,7 +601,10 @@ def main() -> None:
     print(f"saved analysis outputs to {output_dir}")
     print(f"frame_features: {frame_features.shape}")
     print(f"sequence_features: {sequence_features.shape}")
-    print(f"embedding_level: {args.embedding_level}, sampled_points: {sampled_indices.shape[0]}")
+    print(
+        f"embedding_level: {args.embedding_level}, sampler_mode: {args.sampler_mode}, "
+        f"sampled_points: {sampled_indices.shape[0]}"
+    )
 
 
 if __name__ == "__main__":

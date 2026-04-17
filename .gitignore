@@ -1,6 +1,7 @@
 .idea/
 # cache
 .threestudio_cache/
+.cache/
 
 # checkpoints / weights
 ckpts/
@@ -8,9 +9,21 @@ ckpts/
 # python cache
 __pycache__/
 *.pyc
+.DS_Store
+._*
 
 # outputs
 outputs/
 
 talkshow/collection/
 *.npy
+
+# local data / downloads
+data/
+diff-gaussian-rasterization/
+
+# external model assets / local test outputs
+external/flame-head-tracker/models/
+external/flame-head-tracker/test_results_codex/
+external/flame-head-tracker.manual/
+external/flame-head-tracker.tmp/
