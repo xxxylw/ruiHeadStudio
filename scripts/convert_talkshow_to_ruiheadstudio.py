@@ -116,12 +116,19 @@ def convert_sequence(data: Dict, source_path: Path) -> Dict[str, np.ndarray]:
 
     neck_pose = body_pose_axis.reshape(-1, 21, 3)[:, 12]
 
+    video_name = source_path.parent.parent.name if source_path.parent.parent != source_path.parent else source_path.stem
+    clip_name = source_path.parent.name
+
     return {
         "expression": expression,
         "jaw_pose": jaw_pose,
         "leye_pose": leye_pose,
         "reye_pose": reye_pose,
         "neck_pose": neck_pose.astype(np.float32, copy=False),
+        "video_name": video_name,
+        "clip_name": clip_name,
+        "source_file": source_path.name,
+        "source_path": str(source_path),
     }
 
 

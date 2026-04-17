@@ -38,7 +38,7 @@ data:
   gender: 'generic'
   training_w_animation: True
   flame_path: "./ckpts/FLAME-2000"
-  talkshow_train_path: './talkshow/collection/chemistry_exp.npy'
+  talkshow_train_path: './talkshow/collection/chemistry/2nd_Order_Rate_Laws-6BZb96mqmbg__68891-00_01_40-00_01_46_exp.npy'
   talkshow_val_path: './talkshow/ExpressiveWholeBodyDatasetReleaseV1.0/chemistry/2nd_Order_Rate_Laws-6BZb96mqmbg.mp4/68891-00_01_40-00_01_46/68891-00_01_40-00_01_46.pkl'
 
 system_type: "head-3dgs-lks-rig-system"
