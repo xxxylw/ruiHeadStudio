@@ -17,6 +17,12 @@ outputs/
 
 talkshow/collection/
 *.npy
+!talkshow/collection/
+!talkshow/collection/talkvid/
+!talkshow/collection/talkvid/*.npy
+talkshow/collection/*/
+!talkshow/collection/talkvid/
+!talkshow/collection/talkvid/*.npy
 
 # local data / downloads
 data/
@@ -27,3 +33,5 @@ external/flame-head-tracker/models/
 external/flame-head-tracker/test_results_codex/
 external/flame-head-tracker.manual/
 external/flame-head-tracker.tmp/
+
+docs/superpowers/
