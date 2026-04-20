@@ -25,10 +25,14 @@ ruiHeadStudio/
 │               ├── metadata.json
 │               ├── 000000.npz
 │               └── ...
-└── talkshow/
-    └── collection/
-        └── talkvid/
-            └── talkvid_exp.npy
+└── collection/
+    └── ruiheadstudio/
+        └── flame_collections/
+            └── talkvid/
+                ├── talkvid_all.npy
+                └── per_clip/
+                    ├── clip_0001.npy
+                    └── clip_0002.npy
 ```
 
 `metadata.json` is optional but recommended. The converter reads:
@@ -68,7 +72,7 @@ Convert one tracker clip directory:
 ```bash
 conda run -n ruiheadstudio python scripts/convert_talkvid_to_ruiheadstudio.py \
   data/talkvid/flame_tracker/clip_0001 \
-  --output talkshow/collection/talkvid/talkvid_exp.npy
+  --output collection/ruiheadstudio/flame_collections/talkvid/talkvid_all.npy
 ```
 
 Convert all clip directories under a parent folder:
@@ -76,7 +80,7 @@ Convert all clip directories under a parent folder:
 ```bash
 conda run -n ruiheadstudio python scripts/convert_talkvid_to_ruiheadstudio.py \
   data/talkvid/flame_tracker \
-  --output talkshow/collection/talkvid/talkvid_exp.npy
+  --output collection/ruiheadstudio/flame_collections/talkvid/talkvid_all.npy
 ```
 
 Append new clips to an existing collection:
@@ -84,7 +88,7 @@ Append new clips to an existing collection:
 ```bash
 conda run -n ruiheadstudio python scripts/convert_talkvid_to_ruiheadstudio.py \
   data/talkvid/flame_tracker/new_batch \
-  --output talkshow/collection/talkvid/talkvid_exp.npy \
+  --output collection/ruiheadstudio/flame_collections/talkvid/talkvid_all.npy \
   --append
 ```
 

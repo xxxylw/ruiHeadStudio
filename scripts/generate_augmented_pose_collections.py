@@ -14,12 +14,12 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--input",
-        default="talkshow/collection/project_converted_exp.npy",
+        default="collection/ruiheadstudio/flame_collections/talkshow/project_converted_exp.npy",
         help="Input RuiHeadStudio object-array collection .npy file.",
     )
     parser.add_argument(
         "--output-dir",
-        default="talkshow/collection/synthetic_aug",
+        default="collection/ruiheadstudio/flame_collections/talkshow/synthetic_aug",
         help="Directory for generated .npy collections.",
     )
     parser.add_argument(

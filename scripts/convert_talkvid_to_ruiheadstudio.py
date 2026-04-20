@@ -24,7 +24,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--output",
         required=True,
-        help="Output RuiHeadStudio .npy path, e.g. talkshow/collection/talkvid/talkvid_exp.npy",
+        help="Output RuiHeadStudio .npy path, e.g. collection/ruiheadstudio/flame_collections/talkvid/talkvid_all.npy",
     )
     parser.add_argument(
         "--append",

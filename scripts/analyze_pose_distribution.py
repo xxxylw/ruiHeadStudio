@@ -532,7 +532,17 @@ def main() -> None:
             output_dir = output_dir.parent / f"{output_dir.name}_distribution"
         else:
             common_parent = Path(os.path.commonpath([str(path.resolve().parent) for path in input_paths]))
-            output_dir = common_parent / "multi_input_pose_distribution"
+            try:
+                rel_parent = common_parent.resolve().relative_to(
+                    Path("collection/ruiheadstudio/flame_collections").resolve()
+                )
+                output_dir = (
+                    Path("collection/ruiheadstudio/analysis/pose_distribution")
+                    / rel_parent
+                    / "multi_input_pose_distribution"
+                )
+            except ValueError:
+                output_dir = common_parent / "multi_input_pose_distribution"
     else:
         output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)

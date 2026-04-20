@@ -29,4 +29,4 @@
 - [ ] **Step 1: Extend the CLI to accept multiple file/directory inputs and optional top-level group labels**
 - [ ] **Step 2: Add `--sampler-mode=all_frames|train_like` and `--samples-per-input` for frame-level sampling**
 - [ ] **Step 3: Emit combined metadata, group-colored UMAP output, and richer summary counts without breaking the existing source-colored and cluster-colored outputs**
-- [ ] **Step 4: Run the updated analyzer on `project_converted_exp.npy` and `talkshow/collection/synthetic_aug/` to verify the new workflow end-to-end**
+- [ ] **Step 4: Run the updated analyzer on `project_converted_exp.npy` and `collection/ruiheadstudio/flame_collections/talkshow/synthetic_aug/` to verify the new workflow end-to-end**

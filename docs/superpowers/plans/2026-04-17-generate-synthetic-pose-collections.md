@@ -95,7 +95,7 @@ Create `scripts/generate_augmented_pose_collections.py` with:
 - `POSE_KEYS`
 - `generate_augmented_collection(...)`
 - `save_collections(...)`
-- a CLI entry point that reads `talkshow/collection/project_converted_exp.npy`
+- a CLI entry point that reads `collection/ruiheadstudio/flame_collections/talkshow/project_converted_exp.npy`
 - deterministic medium-expansion augmentation for `expression`, `jaw_pose`, `leye_pose`, `reye_pose`, `neck_pose`
 
 - [ ] **Step 4: Run test to verify it passes**
@@ -114,28 +114,28 @@ git commit -m "feat: generate synthetic pose collections"
 
 **Files:**
 - Modify: `scripts/generate_augmented_pose_collections.py`
-- Create: `talkshow/collection/synthetic_aug/aug_pose_mix_01.npy`
-- Create: `talkshow/collection/synthetic_aug/aug_pose_mix_02.npy`
-- Create: `talkshow/collection/synthetic_aug/aug_pose_mix_03.npy`
-- Create: `talkshow/collection/synthetic_aug/aug_pose_mix_04.npy`
-- Create: `talkshow/collection/synthetic_aug/aug_pose_mix_05.npy`
-- Create: `talkshow/collection/synthetic_aug/aug_pose_mix_06.npy`
-- Create: `talkshow/collection/synthetic_aug/aug_pose_mix_07.npy`
-- Create: `talkshow/collection/synthetic_aug/aug_pose_mix_08.npy`
-- Create: `talkshow/collection/synthetic_aug/aug_pose_mix_09.npy`
-- Create: `talkshow/collection/synthetic_aug/aug_pose_mix_10.npy`
+- Create: `collection/ruiheadstudio/flame_collections/talkshow/synthetic_aug/aug_pose_mix_01.npy`
+- Create: `collection/ruiheadstudio/flame_collections/talkshow/synthetic_aug/aug_pose_mix_02.npy`
+- Create: `collection/ruiheadstudio/flame_collections/talkshow/synthetic_aug/aug_pose_mix_03.npy`
+- Create: `collection/ruiheadstudio/flame_collections/talkshow/synthetic_aug/aug_pose_mix_04.npy`
+- Create: `collection/ruiheadstudio/flame_collections/talkshow/synthetic_aug/aug_pose_mix_05.npy`
+- Create: `collection/ruiheadstudio/flame_collections/talkshow/synthetic_aug/aug_pose_mix_06.npy`
+- Create: `collection/ruiheadstudio/flame_collections/talkshow/synthetic_aug/aug_pose_mix_07.npy`
+- Create: `collection/ruiheadstudio/flame_collections/talkshow/synthetic_aug/aug_pose_mix_08.npy`
+- Create: `collection/ruiheadstudio/flame_collections/talkshow/synthetic_aug/aug_pose_mix_09.npy`
+- Create: `collection/ruiheadstudio/flame_collections/talkshow/synthetic_aug/aug_pose_mix_10.npy`
 
 - [ ] **Step 1: Run the generation script**
 
 Run:
-`conda run -n ruiheadstudio python scripts/generate_augmented_pose_collections.py --input talkshow/collection/project_converted_exp.npy --output-dir talkshow/collection/synthetic_aug --num-files 10 --seed 20260417`
+`conda run -n ruiheadstudio python scripts/generate_augmented_pose_collections.py --input collection/ruiheadstudio/flame_collections/talkshow/project_converted_exp.npy --output-dir collection/ruiheadstudio/flame_collections/talkshow/synthetic_aug --num-files 10 --seed 20260417`
 
 Expected: prints 10 saved output paths
 
 - [ ] **Step 2: Verify structure of generated files**
 
 Run:
-`conda run -n ruiheadstudio python -c "import numpy as np; from pathlib import Path; paths=sorted(Path('talkshow/collection/synthetic_aug').glob('*.npy')); print(len(paths)); arr=np.load(paths[0], allow_pickle=True); print(arr.dtype, arr.shape, sorted(arr.tolist()[0].keys()))"`
+`conda run -n ruiheadstudio python -c "import numpy as np; from pathlib import Path; paths=sorted(Path('collection/ruiheadstudio/flame_collections/talkshow/synthetic_aug').glob('*.npy')); print(len(paths)); arr=np.load(paths[0], allow_pickle=True); print(arr.dtype, arr.shape, sorted(arr.tolist()[0].keys()))"`
 
 Expected:
 - `10`
@@ -146,13 +146,13 @@ Expected:
 - [ ] **Step 3: Verify metadata marks synthetic origin**
 
 Run:
-`conda run -n ruiheadstudio python -c "import numpy as np; arr=np.load('talkshow/collection/synthetic_aug/aug_pose_mix_01.npy', allow_pickle=True).tolist(); print(arr[0]['video_name'], arr[0]['clip_name'])"`
+`conda run -n ruiheadstudio python -c "import numpy as np; arr=np.load('collection/ruiheadstudio/flame_collections/talkshow/synthetic_aug/aug_pose_mix_01.npy', allow_pickle=True).tolist(); print(arr[0]['video_name'], arr[0]['clip_name'])"`
 
 Expected: names include `synthetic_medium`
 
 - [ ] **Step 4: Commit**
 
 ```bash
-git add talkshow/collection/synthetic_aug/*.npy
+git add collection/ruiheadstudio/flame_collections/talkshow/synthetic_aug/*.npy
 git commit -m "data: add synthetic medium-extent pose collections"
 ```

@@ -45,7 +45,7 @@ def parse_args() -> argparse.Namespace:
         required=True,
         help=(
             "Output .npy path. Recommended naming follows the existing training file "
-            "pattern, e.g. talkshow/collection/myset_exp.npy"
+            "pattern, e.g. collection/ruiheadstudio/flame_collections/talkshow/myset_exp.npy"
         ),
     )
     parser.add_argument(

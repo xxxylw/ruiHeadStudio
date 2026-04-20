@@ -55,7 +55,7 @@ ckpts/ControlNet-Mediapipe/
 **3. TalkShow 训练数据**：config 里指定了两个路径，确保它们存在：
 
 ```6:7:d:\of_work\code\ruiHeadStudio\configs\headstudio.yaml
-  talkshow_train_path: './talkshow/collection/chemistry_exp.npy'
+  talkshow_train_path: './collection/ruiheadstudio/flame_collections/talkshow/project_converted_exp.npy'
   talkshow_val_path: './talkshow/ExpressiveWholeBodyDatasetReleaseV1.0/chemistry/2nd_Order_Rate_Laws-6BZb96mqmbg.mp4/68891-00_01_40-00_01_46/68891-00_01_40-00_01_46.pkl'
 ```
 

@@ -31,7 +31,7 @@ This progress note summarizes the work completed today around:
 
 - Located and used the existing TalkSHOW conversion workflow.
 - Converted the available project `.pkl` assets into a RuiHeadStudio-compatible FLAME parameter archive:
-  - `talkshow/collection/project_converted_exp.npy`
+  - `collection/ruiheadstudio/flame_collections/talkshow/project_converted_exp.npy`
 - Verified the converted structure contains the expected training fields:
   - `expression`
   - `jaw_pose`
@@ -44,7 +44,7 @@ This progress note summarizes the work completed today around:
 - Added a synthetic augmentation generator:
   - `scripts/generate_augmented_pose_collections.py`
 - Generated 10 mixed synthetic `.npy` files under:
-  - `talkshow/collection/synthetic_aug/`
+  - `collection/ruiheadstudio/flame_collections/talkshow/synthetic_aug/`
 - The generated files blend:
   - perturbation-style local variation
   - moderate outward expansion of expression, jaw, and neck motion
@@ -65,7 +65,7 @@ This progress note summarizes the work completed today around:
   - `project_converted_exp.npy`
   - the 10 synthetic augmentation files
 - Generated outputs in:
-  - `talkshow/collection/combined_distribution_test/`
+  - `collection/ruiheadstudio/analysis/pose_distribution/talkshow/combined_distribution_test/`
 
 ## 5. TalkVid Integration Path
 
