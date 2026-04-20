@@ -15,14 +15,8 @@ __pycache__/
 # outputs
 outputs/
 
+# deprecated local artifact directory
 talkshow/collection/
-*.npy
-!talkshow/collection/
-!talkshow/collection/talkvid/
-!talkshow/collection/talkvid/*.npy
-talkshow/collection/*/
-!talkshow/collection/talkvid/
-!talkshow/collection/talkvid/*.npy
 
 # local data / downloads
 data/
