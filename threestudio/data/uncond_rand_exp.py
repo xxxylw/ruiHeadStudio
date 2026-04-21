@@ -25,6 +25,7 @@ from threestudio.utils.head_v2 import FlamePointswRandomExp
 import os
 import numpy as np
 import pickle
+from pathlib import Path
 
 
 @dataclass
@@ -83,6 +84,10 @@ class RandomCameraDataModuleConfig:
     num_workers: int = 0
     talkshow_train_path: str = "path/to/talkshow_train"
     talkshow_val_path: str = "path/to/talkshow_val"
+    train_pose_inputs: List[str] = field(default_factory=list)
+    train_pose_group_labels: List[str] = field(default_factory=list)
+    train_pose_group_weights: Dict[str, float] = field(default_factory=dict)
+    source_sampling_mode: str = "uniform"
 
     is_lmk: bool = True
     is_mediapipe: bool = True
@@ -90,6 +95,58 @@ class RandomCameraDataModuleConfig:
     control_type: str = "mediapipe"
 
     training_w_animation: bool = True
+
+
+@dataclass(frozen=True)
+class PoseInputSpec:
+    input_path: str
+    group_label: str
+    source_name: str
+
+
+def normalize_train_pose_inputs(cfg_like: Any) -> Dict[str, List[str]]:
+    if isinstance(cfg_like, dict):
+        train_pose_inputs = list(cfg_like.get("train_pose_inputs", []) or [])
+        train_pose_group_labels = list(cfg_like.get("train_pose_group_labels", []) or [])
+        legacy_path = cfg_like.get("talkshow_train_path")
+    else:
+        train_pose_inputs = list(getattr(cfg_like, "train_pose_inputs", []) or [])
+        train_pose_group_labels = list(getattr(cfg_like, "train_pose_group_labels", []) or [])
+        legacy_path = getattr(cfg_like, "talkshow_train_path", None)
+
+    if not train_pose_inputs:
+        if not legacy_path:
+            raise ValueError("No training pose inputs configured.")
+        train_pose_inputs = [legacy_path]
+        train_pose_group_labels = ["talkshow"]
+
+    if train_pose_group_labels and len(train_pose_group_labels) != len(train_pose_inputs):
+        raise ValueError("train_pose_group_labels must match train_pose_inputs length.")
+
+    if not train_pose_group_labels:
+        train_pose_group_labels = [Path(path).stem for path in train_pose_inputs]
+
+    return {
+        "paths": train_pose_inputs,
+        "group_labels": train_pose_group_labels,
+    }
+
+
+def expand_pose_input_specs(paths: List[str], group_labels: List[str]) -> List[PoseInputSpec]:
+    specs: List[PoseInputSpec] = []
+    for input_path, group_label in zip(paths, group_labels):
+        path = Path(input_path)
+        if path.is_dir():
+            children = sorted(child for child in path.glob("*.npy") if child.is_file())
+            if not children:
+                raise FileNotFoundError(f"No .npy files found in directory: {path}")
+            for child in children:
+                specs.append(PoseInputSpec(str(child), group_label, child.stem))
+        elif path.is_file():
+            specs.append(PoseInputSpec(str(path), group_label, path.stem))
+        else:
+            raise FileNotFoundError(path)
+    return specs
 
 
 class RandomCameraIterableDataset(IterableDataset, Updateable):
