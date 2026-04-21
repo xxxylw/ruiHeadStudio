@@ -1,4 +1,5 @@
 import importlib.util
+import numpy as np
 import sys
 import tempfile
 import types
@@ -64,6 +65,17 @@ def load_uncond_rand_exp_module():
     return module
 
 
+def make_sequence(frames=2):
+    t = np.linspace(0.0, 1.0, frames, dtype=np.float32)
+    return {
+        "expression": np.stack([t for _ in range(100)], axis=1).astype(np.float32),
+        "jaw_pose": np.stack([t, t, t], axis=1).astype(np.float32),
+        "leye_pose": np.stack([t, t, t], axis=1).astype(np.float32),
+        "reye_pose": np.stack([t, t, t], axis=1).astype(np.float32),
+        "neck_pose": np.stack([t, t, t], axis=1).astype(np.float32),
+    }
+
+
 class MultiInputLoaderConfigTests(unittest.TestCase):
     def test_normalize_train_pose_inputs_falls_back_to_legacy_path(self):
         module = load_uncond_rand_exp_module()
@@ -105,6 +117,63 @@ class MultiInputLoaderConfigTests(unittest.TestCase):
             self.assertEqual(len(specs), 1)
             self.assertEqual(Path(specs[0].input_path).name, "talkshow.npy")
             self.assertEqual(specs[0].group_label, "talkshow")
+
+    def test_build_pose_training_corpus_groups_sources_and_sequences(self):
+        module = load_uncond_rand_exp_module()
+        with tempfile.TemporaryDirectory() as tmpdir:
+            source = Path(tmpdir) / "talkshow.npy"
+            np.save(source, np.array([make_sequence()], dtype=object), allow_pickle=True)
+
+            corpus = module.build_pose_training_corpus(
+                [module.PoseInputSpec(str(source), "talkshow", "talkshow")],
+                {"talkshow": 1.0},
+                "uniform",
+            )
+
+            self.assertEqual(corpus.group_names, ["talkshow"])
+            self.assertEqual(corpus.group_to_source_indices["talkshow"], [0])
+            self.assertEqual(corpus.source_sequence_counts[0], 1)
+
+    def test_sample_pose_frame_returns_expected_pose_keys(self):
+        module = load_uncond_rand_exp_module()
+        with tempfile.TemporaryDirectory() as tmpdir:
+            source = Path(tmpdir) / "talkshow.npy"
+            np.save(source, np.array([make_sequence(frames=3)], dtype=object), allow_pickle=True)
+            corpus = module.build_pose_training_corpus(
+                [module.PoseInputSpec(str(source), "talkshow", "talkshow")],
+                {"talkshow": 1.0},
+                "uniform",
+            )
+
+            sample = module.sample_pose_frame(corpus, np.random.default_rng(0))
+
+            self.assertEqual(
+                set(sample.keys()),
+                {
+                    "expression",
+                    "jaw_pose",
+                    "leye_pose",
+                    "reye_pose",
+                    "neck_pose",
+                    "group_label",
+                    "source_name",
+                },
+            )
+            self.assertEqual(sample["expression"].shape, (1, 100))
+            self.assertEqual(sample["jaw_pose"].shape, (1, 3))
+
+    def test_build_pose_training_corpus_rejects_unknown_sampling_mode(self):
+        module = load_uncond_rand_exp_module()
+        with tempfile.TemporaryDirectory() as tmpdir:
+            source = Path(tmpdir) / "talkshow.npy"
+            np.save(source, np.array([make_sequence()], dtype=object), allow_pickle=True)
+
+            with self.assertRaisesRegex(ValueError, "Unsupported source_sampling_mode"):
+                module.build_pose_training_corpus(
+                    [module.PoseInputSpec(str(source), "talkshow", "talkshow")],
+                    {"talkshow": 1.0},
+                    "bad_mode",
+                )
 
 
 if __name__ == "__main__":

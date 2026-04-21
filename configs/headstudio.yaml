@@ -39,6 +39,19 @@ data:
   training_w_animation: True
   flame_path: "./ckpts/FLAME-2000"
   talkshow_train_path: './collection/ruiheadstudio/flame_collections/talkshow/project_converted_exp.npy'
+  train_pose_inputs:
+    - './collection/ruiheadstudio/flame_collections/talkshow/project_converted_exp.npy'
+    - './collection/ruiheadstudio/flame_collections/talkshow/synthetic_aug'
+    - './collection/ruiheadstudio/flame_collections/talkvid/per_clip'
+  train_pose_group_labels:
+    - 'talkshow'
+    - 'synthetic_aug'
+    - 'talkvid'
+  train_pose_group_weights:
+    talkshow: 0.34
+    synthetic_aug: 0.33
+    talkvid: 0.33
+  source_sampling_mode: 'uniform'
   talkshow_val_path: './talkshow/ExpressiveWholeBodyDatasetReleaseV1.0/chemistry/2nd_Order_Rate_Laws-6BZb96mqmbg.mp4/68891-00_01_40-00_01_46/68891-00_01_40-00_01_46.pkl'
 
 system_type: "head-3dgs-lks-rig-system"
