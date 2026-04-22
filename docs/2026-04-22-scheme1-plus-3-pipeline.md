@@ -163,6 +163,20 @@
 
 这样可以把环境变量、GPU 选择和阶段配置固定下来，减少每次手工改命令时的漂移。
 
+当前 stage 配置默认共用一份 merged metadata：
+
+- `collection/ruiheadstudio/flame_collections/curriculum/train_pose_metadata.json`
+
+如果这份文件不存在，`run_stage1_prior.sh` 和 `run_stage2_text.sh` 会先调用 `scripts/build_pose_difficulty_metadata.py`，用当前的 `talkshow + synthetic_aug + talkvid` 训练输入重建它，再进入训练。
+
+两阶段的最小执行顺序是：
+
+1. 先运行 `scripts/run_stage1_prior.sh`
+2. 取 stage1 产出的 checkpoint 路径
+3. 再运行 `scripts/run_stage2_text.sh`，并通过 `STAGE1_CKPT=/abs/path/to/last.ckpt` 把它传进去
+
+也就是说，当前版本的 stage handoff 已经不是人工改 yaml，而是通过 stage2 启动脚本的 `STAGE1_CKPT` 入口完成。
+
 ## 当前最小验证状态
 
 截至当前版本，最小可用链路已经验证到：

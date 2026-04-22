@@ -190,6 +190,19 @@ class MultiInputLoaderConfigTests(unittest.TestCase):
 
             self.assertEqual(corpus.sources[0].bucket, "hard")
 
+    def test_load_pose_metadata_merges_multiple_json_files(self):
+        module = load_uncond_rand_exp_module()
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path_a = Path(tmpdir) / "a.json"
+            path_b = Path(tmpdir) / "b.json"
+            path_a.write_text('[{"source_name":"talkshow__a","bucket":"easy"}]', encoding="utf-8")
+            path_b.write_text('[{"source_name":"talkvid__b","bucket":"hard"}]', encoding="utf-8")
+
+            merged = module.load_pose_metadata_inputs([str(path_a), str(path_b)])
+
+            self.assertEqual(merged["talkshow__a"]["bucket"], "easy")
+            self.assertEqual(merged["talkvid__b"]["bucket"], "hard")
+
     def test_resolve_bucket_weights_changes_with_step(self):
         module = load_uncond_rand_exp_module()
         cfg = {

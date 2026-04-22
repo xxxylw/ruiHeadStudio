@@ -52,6 +52,8 @@ data:
     synthetic_aug: 0.33
     talkvid: 0.33
   source_sampling_mode: 'uniform'
+  pose_metadata_inputs:
+    - './collection/ruiheadstudio/flame_collections/curriculum/train_pose_metadata.json'
   difficulty_sampling_mode: 'curriculum'
   curriculum_schedule:
     "0":

@@ -90,6 +90,7 @@ class RandomCameraDataModuleConfig:
     train_pose_group_weights: Dict[str, float] = field(default_factory=dict)
     source_sampling_mode: str = "uniform"
     pose_metadata_path: str = ""
+    pose_metadata_inputs: List[str] = field(default_factory=list)
     difficulty_sampling_mode: str = "none"
     curriculum_schedule: Dict[str, Dict[str, float]] = field(default_factory=dict)
 
@@ -222,12 +223,20 @@ def build_pose_training_corpus(
     )
 
 
+def load_pose_metadata_inputs(paths: List[str]) -> Dict[str, Dict[str, Any]]:
+    merged: Dict[str, Dict[str, Any]] = {}
+    for path in paths:
+        with open(path, "r", encoding="utf-8") as f:
+            raw = json.load(f)
+        for item in raw:
+            merged[item["source_name"]] = item
+    return merged
+
+
 def load_pose_metadata(path: str) -> Dict[str, Dict[str, Any]]:
     if not path:
         return {}
-    with open(path, "r", encoding="utf-8") as f:
-        raw = json.load(f)
-    return {item["source_name"]: item for item in raw}
+    return load_pose_metadata_inputs([path])
 
 
 def resolve_bucket_weights(cfg_like: Any, global_step: int) -> Dict[str, float]:
@@ -352,7 +361,11 @@ class RandomCameraIterableDataset(IterableDataset, Updateable):
             normalized_inputs["paths"],
             normalized_inputs["group_labels"],
         )
-        pose_metadata = load_pose_metadata(self.cfg.pose_metadata_path)
+        metadata_inputs = list(getattr(self.cfg, "pose_metadata_inputs", []) or [])
+        if metadata_inputs:
+            pose_metadata = load_pose_metadata_inputs(metadata_inputs)
+        else:
+            pose_metadata = load_pose_metadata(self.cfg.pose_metadata_path)
         self.pose_corpus = build_pose_training_corpus(
             input_specs,
             dict(self.cfg.train_pose_group_weights),

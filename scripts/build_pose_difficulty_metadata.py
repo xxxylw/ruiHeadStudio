@@ -3,7 +3,7 @@ from __future__ import annotations
 import argparse
 import json
 from pathlib import Path
-from typing import Dict
+from typing import Dict, List
 
 import numpy as np
 
@@ -12,6 +12,19 @@ def _max_frame_delta(values: np.ndarray) -> float:
     if len(values) < 2:
         return 0.0
     return float(np.max(np.linalg.norm(np.diff(values, axis=0), axis=1)))
+
+
+def collect_input_paths(inputs: List[str]) -> List[Path]:
+    collected: List[Path] = []
+    for input_path in inputs:
+        path = Path(input_path)
+        if path.is_dir():
+            collected.extend(sorted(child for child in path.glob("*.npy") if child.is_file()))
+        elif path.is_file():
+            collected.append(path)
+        else:
+            raise FileNotFoundError(path)
+    return collected
 
 
 def compute_sequence_stats(sequence: Dict[str, np.ndarray]) -> Dict[str, float]:
@@ -77,12 +90,14 @@ def build_metadata_entry(item: Dict[str, np.ndarray]) -> Dict[str, float]:
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--input", required=True)
+    parser.add_argument("--input", action="append", required=True)
     parser.add_argument("--output", required=True)
     args = parser.parse_args()
 
-    records = np.load(args.input, allow_pickle=True)
-    metadata = [build_metadata_entry(item) for item in records]
+    metadata = []
+    for input_path in collect_input_paths(args.input):
+        records = np.load(input_path, allow_pickle=True)
+        metadata.extend(build_metadata_entry(item) for item in records)
     Path(args.output).write_text(json.dumps(metadata, indent=2), encoding="utf-8")
 
 

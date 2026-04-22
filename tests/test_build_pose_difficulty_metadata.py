@@ -10,6 +10,7 @@ from scripts.build_pose_difficulty_metadata import (
     build_metadata_entry,
     classify_sequence_bucket,
     compute_sequence_stats,
+    collect_input_paths,
 )
 
 
@@ -99,6 +100,18 @@ class TestBuildPoseDifficultyMetadata(unittest.TestCase):
         }
 
         self.assertEqual(classify_sequence_bucket(hard_stats), "hard")
+
+    def test_collect_input_paths_expands_directory_children(self):
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            (root / "a.npy").write_bytes(b"x")
+            (root / "b.npy").write_bytes(b"x")
+
+            paths = collect_input_paths([str(root)])
+
+            self.assertEqual([path.name for path in paths], ["a.npy", "b.npy"])
 
 
 if __name__ == "__main__":
