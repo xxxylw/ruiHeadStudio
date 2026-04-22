@@ -175,6 +175,21 @@ class MultiInputLoaderConfigTests(unittest.TestCase):
                     "bad_mode",
                 )
 
+    def test_build_pose_training_corpus_attaches_bucket_metadata(self):
+        module = load_uncond_rand_exp_module()
+        with tempfile.TemporaryDirectory() as tmpdir:
+            source = Path(tmpdir) / "talkvid_clip_01.npy"
+            np.save(source, np.array([make_sequence()], dtype=object), allow_pickle=True)
+
+            corpus = module.build_pose_training_corpus(
+                [module.PoseInputSpec(str(source), "talkvid", "talkvid__clip_01")],
+                {"talkvid": 1.0},
+                "uniform",
+                {"talkvid__clip_01": {"bucket": "hard"}},
+            )
+
+            self.assertEqual(corpus.sources[0].bucket, "hard")
+
 
 if __name__ == "__main__":
     unittest.main()

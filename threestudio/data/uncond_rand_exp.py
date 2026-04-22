@@ -1,4 +1,5 @@
 import bisect
+import json
 import math
 import random
 from dataclasses import dataclass, field
@@ -88,6 +89,7 @@ class RandomCameraDataModuleConfig:
     train_pose_group_labels: List[str] = field(default_factory=list)
     train_pose_group_weights: Dict[str, float] = field(default_factory=dict)
     source_sampling_mode: str = "uniform"
+    pose_metadata_path: str = ""
 
     is_lmk: bool = True
     is_mediapipe: bool = True
@@ -109,6 +111,8 @@ class PoseSource:
     group_label: str
     source_name: str
     sequences: List[Dict[str, np.ndarray]]
+    bucket: str = "unlabeled"
+    stats: Dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -170,18 +174,23 @@ def build_pose_training_corpus(
     specs: List[PoseInputSpec],
     group_weights: Dict[str, float],
     source_sampling_mode: str,
+    pose_metadata: Optional[Dict[str, Dict[str, Any]]] = None,
 ) -> PoseTrainingCorpus:
     sources: List[PoseSource] = []
     group_to_source_indices: Dict[str, List[int]] = {}
+    pose_metadata = pose_metadata or {}
 
     for spec in specs:
         sequences = list(np.load(spec.input_path, allow_pickle=True).tolist())
+        source_metadata = dict(pose_metadata.get(spec.source_name, {}))
         source_index = len(sources)
         sources.append(
             PoseSource(
                 group_label=spec.group_label,
                 source_name=spec.source_name,
                 sequences=sequences,
+                bucket=source_metadata.get("bucket", "unlabeled"),
+                stats=source_metadata,
             )
         )
         group_to_source_indices.setdefault(spec.group_label, []).append(source_index)
@@ -209,6 +218,14 @@ def build_pose_training_corpus(
         sources=sources,
         source_sequence_counts=source_sequence_counts,
     )
+
+
+def load_pose_metadata(path: str) -> Dict[str, Dict[str, Any]]:
+    if not path:
+        return {}
+    with open(path, "r", encoding="utf-8") as f:
+        raw = json.load(f)
+    return {item["source_name"]: item for item in raw}
 
 
 def sample_pose_frame(corpus: PoseTrainingCorpus, rng: np.random.Generator) -> Dict[str, Any]:
@@ -293,10 +310,12 @@ class RandomCameraIterableDataset(IterableDataset, Updateable):
             normalized_inputs["paths"],
             normalized_inputs["group_labels"],
         )
+        pose_metadata = load_pose_metadata(self.cfg.pose_metadata_path)
         self.pose_corpus = build_pose_training_corpus(
             input_specs,
             dict(self.cfg.train_pose_group_weights),
             self.cfg.source_sampling_mode,
+            pose_metadata,
         )
         self.pose_rng = np.random.default_rng()
 
