@@ -105,4 +105,5 @@ Suggested workflow:
 2. Run `flame-head-tracker` and save frame results into `data/talkvid/flame_tracker/clip_0001/`
 3. Add `metadata.json` beside the frame `.npz` files
 4. Run `scripts/convert_talkvid_to_ruiheadstudio.py`
-5. Point `configs/headstudio.yaml` to the converted `.npy`
+5. If stage-1 training will use curriculum sampling, run `scripts/build_pose_difficulty_metadata.py` on the converted `.npy`
+6. Point `configs/headstudio.yaml` or the stage configs to the converted `.npy` and metadata JSON
