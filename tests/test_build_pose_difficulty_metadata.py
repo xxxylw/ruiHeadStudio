@@ -27,6 +27,20 @@ class TestBuildPoseDifficultyMetadata(unittest.TestCase):
         bucket = classify_sequence_bucket(stats)
         self.assertEqual(bucket, "easy")
 
+    def test_compute_sequence_stats_includes_head_pose_ranges(self):
+        sequence = {
+            "jaw_pose": np.array([[0.0, 0.0, 0.02], [0.0, 0.0, 0.03]], dtype=np.float32),
+            "neck_pose": np.array([[0.10, 0.20, 0.30], [0.15, 0.25, 0.35]], dtype=np.float32),
+            "expression": np.zeros((2, 100), dtype=np.float32),
+        }
+
+        stats = compute_sequence_stats(sequence)
+
+        self.assertIn("head_yaw_max", stats)
+        self.assertIn("head_pitch_max", stats)
+        self.assertIn("head_roll_max", stats)
+        self.assertIn("expression_norm_max", stats)
+
     def test_build_metadata_entry_falls_back_when_source_name_missing(self):
         sequence = {
             "video_name": "video.mp4",

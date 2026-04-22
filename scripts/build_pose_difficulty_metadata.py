@@ -11,9 +11,20 @@ import numpy as np
 def compute_sequence_stats(sequence: Dict[str, np.ndarray]) -> Dict[str, float]:
     jaw_pose = np.asarray(sequence["jaw_pose"], dtype=np.float32)
     neck_pose = np.asarray(sequence["neck_pose"], dtype=np.float32)
+    expression = np.asarray(
+        sequence.get("expression", np.zeros((jaw_pose.shape[0], 100), dtype=np.float32)),
+        dtype=np.float32,
+    )
+    head_pitch = np.abs(neck_pose[:, 0])
+    head_yaw = np.abs(neck_pose[:, 1])
+    head_roll = np.abs(neck_pose[:, 2])
     return {
         "jaw_open_max": float(np.max(np.abs(jaw_pose[:, 2]))),
         "neck_rot_max": float(np.max(np.linalg.norm(neck_pose, axis=1))),
+        "head_pitch_max": float(np.max(head_pitch)),
+        "head_yaw_max": float(np.max(head_yaw)),
+        "head_roll_max": float(np.max(head_roll)),
+        "expression_norm_max": float(np.max(np.linalg.norm(expression, axis=1))),
     }
 
 
