@@ -41,6 +41,19 @@ class TestBuildPoseDifficultyMetadata(unittest.TestCase):
         self.assertIn("head_roll_max", stats)
         self.assertIn("expression_norm_max", stats)
 
+    def test_compute_sequence_stats_includes_temporal_motion(self):
+        sequence = {
+            "jaw_pose": np.array([[0.0, 0.0, 0.00], [0.0, 0.0, 0.25]], dtype=np.float32),
+            "neck_pose": np.array([[0.0, 0.0, 0.00], [0.0, 0.2, 0.00]], dtype=np.float32),
+            "expression": np.array([[0.0] * 100, [1.0] * 100], dtype=np.float32),
+        }
+
+        stats = compute_sequence_stats(sequence)
+
+        self.assertIn("jaw_delta_max", stats)
+        self.assertIn("neck_delta_max", stats)
+        self.assertIn("expression_delta_max", stats)
+
     def test_build_metadata_entry_falls_back_when_source_name_missing(self):
         sequence = {
             "video_name": "video.mp4",

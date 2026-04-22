@@ -8,6 +8,12 @@ from typing import Dict
 import numpy as np
 
 
+def _max_frame_delta(values: np.ndarray) -> float:
+    if len(values) < 2:
+        return 0.0
+    return float(np.max(np.linalg.norm(np.diff(values, axis=0), axis=1)))
+
+
 def compute_sequence_stats(sequence: Dict[str, np.ndarray]) -> Dict[str, float]:
     jaw_pose = np.asarray(sequence["jaw_pose"], dtype=np.float32)
     neck_pose = np.asarray(sequence["neck_pose"], dtype=np.float32)
@@ -25,6 +31,9 @@ def compute_sequence_stats(sequence: Dict[str, np.ndarray]) -> Dict[str, float]:
         "head_yaw_max": float(np.max(head_yaw)),
         "head_roll_max": float(np.max(head_roll)),
         "expression_norm_max": float(np.max(np.linalg.norm(expression, axis=1))),
+        "jaw_delta_max": _max_frame_delta(jaw_pose),
+        "neck_delta_max": _max_frame_delta(neck_pose),
+        "expression_delta_max": _max_frame_delta(expression),
     }
 
 
