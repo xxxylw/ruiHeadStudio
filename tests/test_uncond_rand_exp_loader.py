@@ -190,6 +190,54 @@ class MultiInputLoaderConfigTests(unittest.TestCase):
 
             self.assertEqual(corpus.sources[0].bucket, "hard")
 
+    def test_resolve_bucket_weights_changes_with_step(self):
+        module = load_uncond_rand_exp_module()
+        cfg = {
+            "difficulty_sampling_mode": "curriculum",
+            "curriculum_schedule": {
+                "0": {"easy": 1.0},
+                "1000": {"hard": 1.0},
+            },
+        }
+
+        weights_step_0 = module.resolve_bucket_weights(cfg, global_step=0)
+        weights_step_2000 = module.resolve_bucket_weights(cfg, global_step=2000)
+
+        self.assertEqual(weights_step_0["easy"], 1.0)
+        self.assertEqual(weights_step_2000["hard"], 1.0)
+
+    def test_sample_pose_frame_uses_curriculum_bucket_weights(self):
+        module = load_uncond_rand_exp_module()
+        with tempfile.TemporaryDirectory() as tmpdir:
+            easy_source = Path(tmpdir) / "easy.npy"
+            hard_source = Path(tmpdir) / "hard.npy"
+            np.save(easy_source, np.array([make_sequence()], dtype=object), allow_pickle=True)
+            np.save(hard_source, np.array([make_sequence()], dtype=object), allow_pickle=True)
+
+            corpus = module.build_pose_training_corpus(
+                [
+                    module.PoseInputSpec(str(easy_source), "talkvid", "talkvid__easy"),
+                    module.PoseInputSpec(str(hard_source), "talkvid", "talkvid__hard"),
+                ],
+                {"talkvid": 1.0},
+                "uniform",
+                {
+                    "talkvid__easy": {"bucket": "easy"},
+                    "talkvid__hard": {"bucket": "hard"},
+                },
+            )
+
+            cfg = {
+                "difficulty_sampling_mode": "curriculum",
+                "curriculum_schedule": {
+                    "0": {"easy": 1.0},
+                    "1000": {"hard": 1.0},
+                },
+            }
+
+            sample = module.sample_pose_frame(corpus, np.random.default_rng(0), global_step=2000, cfg_like=cfg)
+            self.assertEqual(sample["source_name"], "talkvid__hard")
+
 
 if __name__ == "__main__":
     unittest.main()

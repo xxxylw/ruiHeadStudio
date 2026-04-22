@@ -52,6 +52,8 @@ data:
     synthetic_aug: 0.33
     talkvid: 0.33
   source_sampling_mode: 'uniform'
+  difficulty_sampling_mode: 'none'
+  curriculum_schedule: {}
   talkshow_val_path: './talkshow/ExpressiveWholeBodyDatasetReleaseV1.0/chemistry/2nd_Order_Rate_Laws-6BZb96mqmbg.mp4/68891-00_01_40-00_01_46/68891-00_01_40-00_01_46.pkl'
 
 system_type: "head-3dgs-lks-rig-system"

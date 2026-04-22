@@ -90,6 +90,8 @@ class RandomCameraDataModuleConfig:
     train_pose_group_weights: Dict[str, float] = field(default_factory=dict)
     source_sampling_mode: str = "uniform"
     pose_metadata_path: str = ""
+    difficulty_sampling_mode: str = "none"
+    curriculum_schedule: Dict[str, Dict[str, float]] = field(default_factory=dict)
 
     is_lmk: bool = True
     is_mediapipe: bool = True
@@ -228,13 +230,53 @@ def load_pose_metadata(path: str) -> Dict[str, Dict[str, Any]]:
     return {item["source_name"]: item for item in raw}
 
 
-def sample_pose_frame(corpus: PoseTrainingCorpus, rng: np.random.Generator) -> Dict[str, Any]:
+def resolve_bucket_weights(cfg_like: Any, global_step: int) -> Dict[str, float]:
+    if isinstance(cfg_like, dict):
+        mode = cfg_like.get("difficulty_sampling_mode", "none")
+        schedule = dict(cfg_like.get("curriculum_schedule", {}) or {})
+    else:
+        mode = getattr(cfg_like, "difficulty_sampling_mode", "none")
+        schedule = dict(getattr(cfg_like, "curriculum_schedule", {}) or {})
+
+    if mode != "curriculum" or not schedule:
+        return {}
+
+    active_steps = sorted(int(step) for step in schedule.keys() if int(step) <= global_step)
+    if not active_steps:
+        return {}
+    return dict(schedule[str(active_steps[-1])])
+
+
+def sample_pose_frame(
+    corpus: PoseTrainingCorpus,
+    rng: np.random.Generator,
+    global_step: int = 0,
+    cfg_like: Any = None,
+) -> Dict[str, Any]:
     group_index = int(rng.choice(len(corpus.group_names), p=corpus.group_probs))
     group_name = corpus.group_names[group_index]
 
     source_choices = corpus.group_to_source_indices[group_name]
-    source_local_index = int(rng.choice(len(source_choices), p=corpus.source_probs_by_group[group_name]))
-    source = corpus.sources[source_choices[source_local_index]]
+    bucket_weights = resolve_bucket_weights(cfg_like, global_step) if cfg_like is not None else {}
+    if bucket_weights:
+        eligible_source_indices = [
+            source_index
+            for source_index in source_choices
+            if bucket_weights.get(corpus.sources[source_index].bucket, 0.0) > 0.0
+        ]
+        if eligible_source_indices:
+            probs = np.array(
+                [bucket_weights[corpus.sources[source_index].bucket] for source_index in eligible_source_indices],
+                dtype=np.float64,
+            )
+            probs = probs / probs.sum()
+            source = corpus.sources[int(rng.choice(eligible_source_indices, p=probs))]
+        else:
+            source_local_index = int(rng.choice(len(source_choices), p=corpus.source_probs_by_group[group_name]))
+            source = corpus.sources[source_choices[source_local_index]]
+    else:
+        source_local_index = int(rng.choice(len(source_choices), p=corpus.source_probs_by_group[group_name]))
+        source = corpus.sources[source_choices[source_local_index]]
 
     sequence = source.sequences[int(rng.integers(0, len(source.sequences)))]
     frame_index = int(rng.integers(0, sequence["expression"].shape[0]))
@@ -575,7 +617,12 @@ class RandomCameraIterableDataset(IterableDataset, Updateable):
                                    ].repeat(self.batch_size, 1)
 
         if self.cfg.training_w_animation:
-            sampled_pose = sample_pose_frame(self.pose_corpus, self.pose_rng)
+            sampled_pose = sample_pose_frame(
+                self.pose_corpus,
+                self.pose_rng,
+                global_step=self.cur_step,
+                cfg_like=self.cfg,
+            )
             expression = torch.from_numpy(sampled_pose['expression']).to('cuda')
             jaw_pose = torch.from_numpy(sampled_pose['jaw_pose']).to('cuda')
             leye_pose = torch.from_numpy(sampled_pose['leye_pose']).to('cuda')
