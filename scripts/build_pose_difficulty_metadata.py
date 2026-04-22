@@ -27,6 +27,20 @@ def classify_sequence_bucket(stats: Dict[str, float]) -> str:
     return "rare"
 
 
+def build_metadata_entry(item: Dict[str, np.ndarray]) -> Dict[str, float]:
+    stats = compute_sequence_stats(item)
+    source_name = item.get("source_name") or item.get("source_file")
+    if not source_name:
+        source_name = f"{item.get('video_name', 'unknown_video')}__{item.get('clip_name', 'unknown_clip')}"
+    return {
+        "source_name": source_name,
+        "video_name": item.get("video_name", ""),
+        "clip_name": item.get("clip_name", ""),
+        "bucket": classify_sequence_bucket(stats),
+        **stats,
+    }
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--input", required=True)
@@ -34,18 +48,7 @@ def main() -> None:
     args = parser.parse_args()
 
     records = np.load(args.input, allow_pickle=True)
-    metadata = []
-    for item in records:
-        stats = compute_sequence_stats(item)
-        metadata.append(
-            {
-                "source_name": item["source_name"],
-                "video_name": item["video_name"],
-                "clip_name": item["clip_name"],
-                "bucket": classify_sequence_bucket(stats),
-                **stats,
-            }
-        )
+    metadata = [build_metadata_entry(item) for item in records]
     Path(args.output).write_text(json.dumps(metadata, indent=2), encoding="utf-8")
 
 

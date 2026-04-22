@@ -163,6 +163,17 @@
 
 这样可以把环境变量、GPU 选择和阶段配置固定下来，减少每次手工改命令时的漂移。
 
+## 当前最小验证状态
+
+截至当前版本，最小可用链路已经验证到：
+
+- 离线难度元数据脚本可以从现有 `.npy` 集合生成 `bucket` 元信息
+- loader 可以读取 metadata，并按 `curriculum_schedule` 做 bucket 级采样
+- `stage1 prior` 和 `stage2 text` 两份配置都能被训练入口读入
+- 在补齐 worktree 内的 FLAME 资源链接后，两条 stage smoke test 都至少推进到了 `Loading ControlNet ...`
+
+这意味着当前阻塞点已经从“配置和采样逻辑是否成立”，前移到了更慢的模型加载与一步训练验证。
+
 ## 数据采样策略建议
 
 如果只做最小可用版本，建议先实现三件事：
