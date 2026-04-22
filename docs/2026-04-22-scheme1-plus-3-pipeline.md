@@ -168,11 +168,26 @@
 截至当前版本，最小可用链路已经验证到：
 
 - 离线难度元数据脚本可以从现有 `.npy` 集合生成 `bucket` 元信息
+- 当前最小打标规则已经不再只看 `jaw_open_max` 和 `neck_rot_max`，还会综合 `head yaw/pitch`、相邻帧参数变化量以及 `expression` 强度
 - loader 可以读取 metadata，并按 `curriculum_schedule` 做 bucket 级采样
 - `stage1 prior` 和 `stage2 text` 两份配置都能被训练入口读入
 - 在补齐 worktree 内的 FLAME 资源链接后，两条 stage smoke test 都至少推进到了 `Loading ControlNet ...`
 
 这意味着当前阻塞点已经从“配置和采样逻辑是否成立”，前移到了更慢的模型加载与一步训练验证。
+
+当前增强版难度打标使用的指标包括：
+
+- `jaw_open_max`
+- `neck_rot_max`
+- `head_pitch_max`
+- `head_yaw_max`
+- `head_roll_max`
+- `expression_norm_max`
+- `jaw_delta_max`
+- `neck_delta_max`
+- `expression_delta_max`
+
+这些阈值目前仍然是启发式的，不是从标注数据拟合出来的。它们的作用是先把“静态大姿态”“高速动作”“强表情”区分开，便于 curriculum sampling 落地。后续如果发现 `TalkSHOW` 和 `TalkVid` 的统计分布差异明显，应该分别做阈值校准，而不是强行共用同一套分桶边界。
 
 ## 数据采样策略建议
 

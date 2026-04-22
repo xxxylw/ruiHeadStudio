@@ -68,6 +68,38 @@ class TestBuildPoseDifficultyMetadata(unittest.TestCase):
         self.assertEqual(entry["source_name"], "video__clip_01")
         self.assertEqual(entry["bucket"], "easy")
 
+    def test_build_metadata_entry_keeps_existing_fields_and_adds_new_stats(self):
+        sequence = {
+            "video_name": "video.mp4",
+            "clip_name": "clip_01",
+            "source_file": "video__clip_01",
+            "jaw_pose": np.array([[0.0, 0.0, 0.02]], dtype=np.float32),
+            "neck_pose": np.array([[0.02, 0.03, 0.01]], dtype=np.float32),
+            "expression": np.zeros((1, 100), dtype=np.float32),
+        }
+
+        entry = build_metadata_entry(sequence)
+
+        self.assertIn("source_name", entry)
+        self.assertIn("bucket", entry)
+        self.assertIn("head_yaw_max", entry)
+        self.assertIn("expression_delta_max", entry)
+
+    def test_classify_sequence_bucket_marks_large_yaw_or_fast_motion_as_hard(self):
+        hard_stats = {
+            "jaw_open_max": 0.04,
+            "neck_rot_max": 0.08,
+            "head_pitch_max": 0.05,
+            "head_yaw_max": 0.38,
+            "head_roll_max": 0.02,
+            "expression_norm_max": 0.2,
+            "jaw_delta_max": 0.01,
+            "neck_delta_max": 0.03,
+            "expression_delta_max": 0.02,
+        }
+
+        self.assertEqual(classify_sequence_bucket(hard_stats), "hard")
+
 
 if __name__ == "__main__":
     unittest.main()

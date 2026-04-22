@@ -38,13 +38,27 @@ def compute_sequence_stats(sequence: Dict[str, np.ndarray]) -> Dict[str, float]:
 
 
 def classify_sequence_bucket(stats: Dict[str, float]) -> str:
-    if stats["jaw_open_max"] < 0.08 and stats["neck_rot_max"] < 0.12:
-        return "easy"
-    if stats["jaw_open_max"] < 0.18 and stats["neck_rot_max"] < 0.22:
-        return "medium"
-    if stats["jaw_open_max"] < 0.30 and stats["neck_rot_max"] < 0.35:
+    if (
+        stats["head_yaw_max"] >= 0.45
+        or stats["expression_delta_max"] >= 12.0
+        or stats["neck_delta_max"] >= 0.35
+    ):
+        return "rare"
+    if (
+        stats["head_yaw_max"] >= 0.30
+        or stats["head_pitch_max"] >= 0.25
+        or stats["expression_norm_max"] >= 8.0
+        or stats["jaw_delta_max"] >= 0.20
+    ):
         return "hard"
-    return "rare"
+    if (
+        stats["head_yaw_max"] >= 0.15
+        or stats["head_pitch_max"] >= 0.12
+        or stats["expression_norm_max"] >= 3.0
+        or stats["jaw_open_max"] >= 0.12
+    ):
+        return "medium"
+    return "easy"
 
 
 def build_metadata_entry(item: Dict[str, np.ndarray]) -> Dict[str, float]:
