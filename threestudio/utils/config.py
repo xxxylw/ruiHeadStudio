@@ -91,8 +91,12 @@ class ExperimentConfig:
                 else:
                     self.timestamp = datetime.now().strftime("@%Y%m%d-%H%M%S")
         self.trial_name += self.timestamp
-        self.exp_dir = os.path.join(self.exp_root_dir, self.name)
-        self.trial_dir = os.path.join(self.exp_dir, self.trial_name)
+        if self.tag:
+            self.exp_dir = os.path.join(self.exp_root_dir, self.trial_name)
+            self.trial_dir = os.path.join(self.exp_dir, self.name)
+        else:
+            self.exp_dir = os.path.join(self.exp_root_dir, self.name)
+            self.trial_dir = os.path.join(self.exp_dir, self.trial_name)
         os.makedirs(self.trial_dir, exist_ok=True)
 
 
