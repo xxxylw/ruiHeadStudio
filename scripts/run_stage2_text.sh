@@ -7,9 +7,10 @@ TRAIN_ENV_PREFIX="${TRAIN_ENV_PREFIX:-/home/rui/miniconda3/envs/ruiheadstudio}"
 export PYTHONPATH="${PYTHONPATH:-$PWD}"
 export PYTHONUNBUFFERED=1
 export CUDA_HOME="${CUDA_HOME:-$TRAIN_ENV_PREFIX}"
+export CONDA_PREFIX="$TRAIN_ENV_PREFIX"
 export BNB_CUDA_VERSION="${BNB_CUDA_VERSION:-118}"
 export PATH="$TRAIN_ENV_PREFIX/bin:$CUDA_HOME/bin:/usr/bin:/bin"
-export LD_LIBRARY_PATH="$CUDA_HOME/lib64:$CUDA_HOME/lib"
+export LD_LIBRARY_PATH="$CUDA_HOME/lib64:$CUDA_HOME/lib:/usr/local/lib:/usr/lib/wsl/lib"
 
 run_in_clean_env() {
   env -i \
@@ -17,6 +18,7 @@ run_in_clean_env() {
     HF_ENDPOINT="${HF_ENDPOINT}" \
     HF_HOME="${HF_HOME}" \
     TRAIN_ENV_PREFIX="${TRAIN_ENV_PREFIX}" \
+    CONDA_PREFIX="${CONDA_PREFIX}" \
     PYTHONPATH="${PYTHONPATH}" \
     PYTHONUNBUFFERED="${PYTHONUNBUFFERED}" \
     CUDA_HOME="${CUDA_HOME}" \

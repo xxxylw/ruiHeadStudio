@@ -30,8 +30,14 @@ class TestStageRunScripts(unittest.TestCase):
 
         self.assertIn('export BNB_CUDA_VERSION="${BNB_CUDA_VERSION:-118}"', stage1)
         self.assertIn('export BNB_CUDA_VERSION="${BNB_CUDA_VERSION:-118}"', stage2)
-        self.assertIn('export LD_LIBRARY_PATH="$CUDA_HOME/lib64:$CUDA_HOME/lib"', stage1)
-        self.assertIn('export LD_LIBRARY_PATH="$CUDA_HOME/lib64:$CUDA_HOME/lib"', stage2)
+        self.assertIn(
+            'export LD_LIBRARY_PATH="$CUDA_HOME/lib64:$CUDA_HOME/lib:/usr/local/lib:/usr/lib/wsl/lib"',
+            stage1,
+        )
+        self.assertIn(
+            'export LD_LIBRARY_PATH="$CUDA_HOME/lib64:$CUDA_HOME/lib:/usr/local/lib:/usr/lib/wsl/lib"',
+            stage2,
+        )
 
     def test_stage_run_scripts_use_dedicated_training_env_prefix(self):
         stage1 = Path("scripts/run_stage1_prior.sh").read_text(encoding="utf-8")
@@ -39,6 +45,8 @@ class TestStageRunScripts(unittest.TestCase):
 
         self.assertIn('TRAIN_ENV_PREFIX="${TRAIN_ENV_PREFIX:-/home/rui/miniconda3/envs/ruiheadstudio}"', stage1)
         self.assertIn('TRAIN_ENV_PREFIX="${TRAIN_ENV_PREFIX:-/home/rui/miniconda3/envs/ruiheadstudio}"', stage2)
+        self.assertIn('export CONDA_PREFIX="$TRAIN_ENV_PREFIX"', stage1)
+        self.assertIn('export CONDA_PREFIX="$TRAIN_ENV_PREFIX"', stage2)
         self.assertIn('"$TRAIN_ENV_PREFIX/bin/python"', stage1)
         self.assertIn('"$TRAIN_ENV_PREFIX/bin/python"', stage2)
 
