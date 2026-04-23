@@ -22,6 +22,7 @@ from simple_knn._C import distCUDA2
 
 from gaussiansplatting.utils.sh_utils import RGB2SH
 from gaussiansplatting.utils.system_utils import mkdir_p
+from gaussiansplatting.utils.flame_anchor import apply_face_transform
 from gaussiansplatting.scene.gaussian_model import GaussianModel
 from gaussiansplatting.utils.general_utils import strip_symmetric, build_scaling_rotation_only
 from gaussiansplatting.utils.general_utils import inverse_sigmoid, get_expon_lr_func, build_rotation
@@ -75,6 +76,7 @@ class GaussianFlameModel(GaussianModel):
         self._leye_pose = torch.zeros([1, 3], device=self.device)
         self._reye_pose = torch.zeros([1, 3], device=self.device)
         self._neck_pose = torch.zeros([1, 3], device=self.device)
+        self._xyz_anchor = torch.empty(0, device=self.device)
 
     @property
     def get_shape(self):
@@ -190,8 +192,15 @@ class GaussianFlameModel(GaussianModel):
     @property
     def get_xyz(self):
         T, R, S = self.get_trans_matrix()
-        xyz = (S + 1e-10).sqrt().unsqueeze(-1) * torch.bmm(R, self._xyz.unsqueeze(-1)).squeeze(-1) + T
-        return xyz
+        return apply_face_transform(self._xyz, T, R, S)
+
+    def get_face_transform_components(self):
+        T, R, S = self.get_trans_matrix()
+        return T, R, S
+
+    def get_anchor_world_xyz(self):
+        T, R, S = self.get_face_transform_components()
+        return apply_face_transform(self._xyz_anchor, T, R, S)
 
     def extract_tris(self, betas, expression, global_orient=None, jaw_pose=None, leye_pose=None, reye_pose=None,
                      center=None, scale=None):
@@ -282,6 +291,7 @@ class GaussianFlameModel(GaussianModel):
 
         print("Number of points at initialisation : ", fused_points.shape[0])
         self._xyz = nn.Parameter(fused_points.requires_grad_(True))
+        self._xyz_anchor = fused_points.detach().clone()
 
         dist2 = torch.clamp_min(distCUDA2(self.get_xyz), 0.0000001)
         scales = torch.sqrt(dist2)[..., None].repeat(1, 3)
@@ -385,6 +395,7 @@ class GaussianFlameModel(GaussianModel):
         faces = faces.astype(np.int32)
 
         self._xyz = nn.Parameter(torch.tensor(xyz, dtype=torch.float, device="cuda").requires_grad_(True))
+        self._xyz_anchor = self._xyz.detach().clone()
         self._features_dc = nn.Parameter(
             torch.tensor(features_dc, dtype=torch.float, device="cuda").transpose(1, 2).contiguous().requires_grad_(
                 True))
@@ -499,6 +510,7 @@ class GaussianFlameModel(GaussianModel):
         self._rotation = optimizable_tensors["rotation"]
 
         self._faces = torch.cat([self._faces, new_faces], dim=0)
+        self._xyz_anchor = torch.cat([self._xyz_anchor, new_xyz.detach().clone()], dim=0)
 
         self.num_gs = self._xyz.shape[0]
 
@@ -521,6 +533,7 @@ class GaussianFlameModel(GaussianModel):
         self.num_gs = self._xyz.shape[0]
 
         self._faces = self._faces[valid_points_mask]
+        self._xyz_anchor = self._xyz_anchor[valid_points_mask]
 
         self.xyz_gradient_accum = self.xyz_gradient_accum[valid_points_mask]
 

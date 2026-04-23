@@ -251,6 +251,28 @@ class MultiInputLoaderConfigTests(unittest.TestCase):
             sample = module.sample_pose_frame(corpus, np.random.default_rng(0), global_step=2000, cfg_like=cfg)
             self.assertEqual(sample["source_name"], "talkvid__hard")
 
+    def test_sample_pose_frame_can_return_adjacent_pair(self):
+        module = load_uncond_rand_exp_module()
+        with tempfile.TemporaryDirectory() as tmpdir:
+            source = Path(tmpdir) / "talkshow.npy"
+            np.save(source, np.array([make_sequence(frames=4)], dtype=object), allow_pickle=True)
+            corpus = module.build_pose_training_corpus(
+                [module.PoseInputSpec(str(source), "talkshow", "talkshow")],
+                {"talkshow": 1.0},
+                "uniform",
+            )
+
+            sampled = module.sample_pose_frame(
+                corpus,
+                np.random.default_rng(0),
+                cfg_like={"sample_adjacent_frame": True, "adjacent_frame_max_offset": 1},
+            )
+
+            self.assertIn("adjacent_expression", sampled)
+            self.assertIn("adjacent_jaw_pose", sampled)
+            self.assertEqual(sampled["adjacent_expression"].shape, (1, 100))
+            self.assertEqual(sampled["adjacent_jaw_pose"].shape, (1, 3))
+
 
 if __name__ == "__main__":
     unittest.main()

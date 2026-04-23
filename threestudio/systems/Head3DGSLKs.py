@@ -249,6 +249,34 @@ class Head3DGSLKsRig(BaseLift3DSystem):
         self.log("train/loss_shape", loss_shape)
         loss += loss_shape * self.C(self.cfg.loss.lambda_shape)
 
+        lambda_anchor = self.cfg.loss.get("lambda_anchor", 0.0)
+        if lambda_anchor > 0.0:
+            anchor_xyz = self.gaussian.get_anchor_world_xyz()
+            current_xyz = self.gaussian.get_xyz
+            loss_anchor = F.smooth_l1_loss(current_xyz, anchor_xyz.detach(), reduction="mean")
+            self.log("train/loss_anchor", loss_anchor)
+            loss += loss_anchor * self.C(lambda_anchor)
+
+        lambda_temporal_xyz = self.cfg.loss.get("lambda_temporal_xyz", 0.0)
+        if lambda_temporal_xyz > 0.0 and batch.get("adjacent_expression", None) is not None:
+            current_xyz = self.gaussian.get_xyz
+            original_expression = self.gaussian._expression
+            original_jaw_pose = self.gaussian._jaw_pose
+            original_neck_pose = self.gaussian._neck_pose
+
+            self.gaussian._expression = batch["adjacent_expression"].detach()
+            self.gaussian._jaw_pose = batch["adjacent_jaw_pose"].detach()
+            self.gaussian._neck_pose = batch["adjacent_neck_pose"].detach()
+            adjacent_xyz = self.gaussian.get_xyz
+
+            self.gaussian._expression = original_expression
+            self.gaussian._jaw_pose = original_jaw_pose
+            self.gaussian._neck_pose = original_neck_pose
+
+            loss_temporal_xyz = (adjacent_xyz - current_xyz).norm(dim=1).mean()
+            self.log("train/loss_temporal_xyz", loss_temporal_xyz)
+            loss += loss_temporal_xyz * self.C(lambda_temporal_xyz)
+
         loss_sparsity = (out["opacity"] ** 2 + 0.01).sqrt().mean()
         self.log("train/loss_sparsity", loss_sparsity)
         loss += loss_sparsity * self.C(self.cfg.loss.lambda_sparsity)

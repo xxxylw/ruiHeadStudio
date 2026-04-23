@@ -55,6 +55,8 @@ data:
   pose_metadata_inputs:
     - './collection/ruiheadstudio/flame_collections/curriculum/train_pose_metadata.json'
   difficulty_sampling_mode: 'curriculum'
+  sample_adjacent_frame: true
+  adjacent_frame_max_offset: 1
   curriculum_schedule:
     "0":
       easy: 0.6
@@ -111,7 +113,7 @@ system:
   prompt_processor_type: "stable-diffusion-prompt-processor"
   prompt_processor:
     pretrained_model_name_or_path: "stablediffusionapi/realistic-vision-51"
-    prompt: "Elon Musk, RAW photo, (high detailed skin:1.2), 8k uhd, dslr, soft lighting, high quality, film grain, Fujifilm XT3"
+    prompt: "a neutral photorealistic human head portrait, realistic skin, natural face, studio lighting"
     negative_prompt: "shadow, dark face, eyeglass, glasses, noise,pattern, strange color, (deformed iris, deformed pupils, semi-realistic, cgi, 3d, render, sketch, cartoon, drawing, anime:1.4), text, close up, cropped, out of frame, worst quality, low quality, jpeg artifacts, ugly, duplicate, morbid, mutilated, poorly drawn face, mutation, deformed, blurry, dehydrated, bad anatomy, bad proportions, extra limbs, cloned face, disfigured, gross proportions,long neck"
 
   loggers:
@@ -121,7 +123,9 @@ system:
       name: None
 
   loss:
-    lambda_sds: 1.
+    lambda_sds: 0.2
+    lambda_anchor: 1.0
+    lambda_temporal_xyz: 0.1
     lambda_sparsity: 1.
     lambda_opaque: 0.0
     lambda_position: 10.0

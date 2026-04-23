@@ -93,6 +93,8 @@ class RandomCameraDataModuleConfig:
     pose_metadata_inputs: List[str] = field(default_factory=list)
     difficulty_sampling_mode: str = "none"
     curriculum_schedule: Dict[str, Dict[str, float]] = field(default_factory=dict)
+    sample_adjacent_frame: bool = False
+    adjacent_frame_max_offset: int = 1
 
     is_lmk: bool = True
     is_mediapipe: bool = True
@@ -289,8 +291,24 @@ def sample_pose_frame(
 
     sequence = source.sequences[int(rng.integers(0, len(source.sequences)))]
     frame_index = int(rng.integers(0, sequence["expression"].shape[0]))
+    adjacent_frame_index = frame_index
 
-    return {
+    if cfg_like is not None:
+        if isinstance(cfg_like, dict):
+            sample_adjacent_frame = bool(cfg_like.get("sample_adjacent_frame", False))
+            adjacent_frame_max_offset = int(cfg_like.get("adjacent_frame_max_offset", 1))
+        else:
+            sample_adjacent_frame = bool(getattr(cfg_like, "sample_adjacent_frame", False))
+            adjacent_frame_max_offset = int(getattr(cfg_like, "adjacent_frame_max_offset", 1))
+        if sample_adjacent_frame and sequence["expression"].shape[0] > 1:
+            offset_choices = [
+                offset for offset in range(-adjacent_frame_max_offset, adjacent_frame_max_offset + 1) if offset != 0
+            ]
+            if offset_choices:
+                candidate_index = frame_index + int(rng.choice(offset_choices))
+                adjacent_frame_index = max(0, min(sequence["expression"].shape[0] - 1, candidate_index))
+
+    sample = {
         "expression": sequence["expression"][frame_index: frame_index + 1],
         "jaw_pose": sequence["jaw_pose"][frame_index: frame_index + 1],
         "leye_pose": sequence["leye_pose"][frame_index: frame_index + 1],
@@ -299,6 +317,23 @@ def sample_pose_frame(
         "group_label": group_name,
         "source_name": source.source_name,
     }
+    if adjacent_frame_index != frame_index or (
+        cfg_like is not None and (
+            cfg_like.get("sample_adjacent_frame", False)
+            if isinstance(cfg_like, dict)
+            else getattr(cfg_like, "sample_adjacent_frame", False)
+        )
+    ):
+        sample.update(
+            {
+                "adjacent_expression": sequence["expression"][adjacent_frame_index: adjacent_frame_index + 1],
+                "adjacent_jaw_pose": sequence["jaw_pose"][adjacent_frame_index: adjacent_frame_index + 1],
+                "adjacent_leye_pose": sequence["leye_pose"][adjacent_frame_index: adjacent_frame_index + 1],
+                "adjacent_reye_pose": sequence["reye_pose"][adjacent_frame_index: adjacent_frame_index + 1],
+                "adjacent_neck_pose": sequence["neck_pose"][adjacent_frame_index: adjacent_frame_index + 1],
+            }
+        )
+    return sample
 
 
 class RandomCameraIterableDataset(IterableDataset, Updateable):
@@ -641,12 +676,22 @@ class RandomCameraIterableDataset(IterableDataset, Updateable):
             leye_pose = torch.from_numpy(sampled_pose['leye_pose']).to('cuda')
             reye_pose = torch.from_numpy(sampled_pose['reye_pose']).to('cuda')
             neck_pose = torch.from_numpy(sampled_pose['neck_pose']).to('cuda')
+            adjacent_expression = torch.from_numpy(sampled_pose['adjacent_expression']).to('cuda') if 'adjacent_expression' in sampled_pose else None
+            adjacent_jaw_pose = torch.from_numpy(sampled_pose['adjacent_jaw_pose']).to('cuda') if 'adjacent_jaw_pose' in sampled_pose else None
+            adjacent_leye_pose = torch.from_numpy(sampled_pose['adjacent_leye_pose']).to('cuda') if 'adjacent_leye_pose' in sampled_pose else None
+            adjacent_reye_pose = torch.from_numpy(sampled_pose['adjacent_reye_pose']).to('cuda') if 'adjacent_reye_pose' in sampled_pose else None
+            adjacent_neck_pose = torch.from_numpy(sampled_pose['adjacent_neck_pose']).to('cuda') if 'adjacent_neck_pose' in sampled_pose else None
         else:
             expression = None
             jaw_pose = None
             leye_pose = None
             reye_pose = None
             neck_pose = None
+            adjacent_expression = None
+            adjacent_jaw_pose = None
+            adjacent_leye_pose = None
+            adjacent_reye_pose = None
+            adjacent_neck_pose = None
 
         cond_kwargs = dict(
             dist=camera_distances, elev=elevation_deg, azim=azimuth_deg,
@@ -680,6 +725,11 @@ class RandomCameraIterableDataset(IterableDataset, Updateable):
             'leye_pose': leye_pose,
             'reye_pose': reye_pose,
             'neck_pose': neck_pose,
+            'adjacent_expression': adjacent_expression,
+            'adjacent_jaw_pose': adjacent_jaw_pose,
+            'adjacent_leye_pose': adjacent_leye_pose,
+            'adjacent_reye_pose': adjacent_reye_pose,
+            'adjacent_neck_pose': adjacent_neck_pose,
         }
 
 

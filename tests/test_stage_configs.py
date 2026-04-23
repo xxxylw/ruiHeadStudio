@@ -45,6 +45,17 @@ class TestStageConfigs(unittest.TestCase):
         self.assertFalse(stage1.system.guidance.use_nfsd)
         self.assertTrue(stage2.system.guidance.use_nfsd)
 
+    def test_stage1_uses_neutral_prompt_and_lower_sds_weight(self):
+        stage1 = OmegaConf.load("configs/headstudio_stage1_prior.yaml")
+        stage2 = OmegaConf.load("configs/headstudio_stage2_text.yaml")
+
+        self.assertNotEqual(
+            stage1.system.prompt_processor.prompt,
+            stage2.system.prompt_processor.prompt,
+        )
+        self.assertIn("human head", stage1.system.prompt_processor.prompt.lower())
+        self.assertLess(stage1.system.loss.lambda_sds, stage2.system.loss.lambda_sds)
+
     def test_stage_configs_use_prompt_first_trial_layout(self):
         stage1 = load_config(
             "configs/headstudio_stage1_prior.yaml",
