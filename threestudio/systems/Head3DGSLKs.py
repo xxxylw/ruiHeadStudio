@@ -41,9 +41,11 @@ class Head3DGSLKsRig(BaseLift3DSystem):
         size_threshold_fix_step: int = 1500
         half_scheduler_max_step: int = 1500
         max_grad: float = 0.0002
+        densify_min_opacity: float = 0.05
         prune_only_start_step: int = 2400
         prune_only_end_step: int = 3300
         prune_only_interval: int = 300
+        prune_only_min_opacity: float = 0.005
         prune_size_threshold: float = 0.008
 
         apose: bool = True
@@ -312,7 +314,12 @@ class Head3DGSLKsRig(BaseLift3DSystem):
 
                 if self.true_global_step > self.cfg.densify_prune_start_step and self.true_global_step % self.cfg.densify_prune_interval == 0:  # 500 100
                     size_threshold = self.cfg.size_threshold if self.true_global_step > self.cfg.size_threshold_fix_step else None  # 3000
-                    self.gaussian.densify_and_prune(self.cfg.max_grad, 0.05, self.cameras_extent, size_threshold)
+                    self.gaussian.densify_and_prune(
+                        self.cfg.max_grad,
+                        self.cfg.densify_min_opacity,
+                        self.cameras_extent,
+                        size_threshold,
+                    )
 
                     # prune-only phase according to Gaussian size, rather than the stochastic gradient to eliminate floating artifacts.
             if self.true_global_step > self.cfg.prune_only_start_step and self.true_global_step < self.cfg.prune_only_end_step:
@@ -326,7 +333,10 @@ class Head3DGSLKsRig(BaseLift3DSystem):
                 self.gaussian.add_densification_stats(viewspace_point_tensor_grad, self.visibility_filter)
 
                 if self.true_global_step % self.cfg.prune_only_interval == 0:
-                    self.gaussian.prune_only(extent=self.cameras_extent)
+                    self.gaussian.prune_only(
+                        min_opacity=self.cfg.prune_only_min_opacity,
+                        extent=self.cameras_extent,
+                    )
 
             if self.true_global_step > self.cfg.shape_update_end_step:
                 for param_group in self.gaussian.optimizer.param_groups:

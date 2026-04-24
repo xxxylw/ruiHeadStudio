@@ -7,6 +7,7 @@ class TestStageRunScripts(unittest.TestCase):
     def test_stage_run_scripts_exist(self):
         self.assertTrue(os.path.exists("scripts/run_stage1_prior.sh"))
         self.assertTrue(os.path.exists("scripts/run_stage2_text.sh"))
+        self.assertTrue(os.path.exists("scripts/run_two_stage.sh"))
 
     def test_stage_run_scripts_prepare_pose_metadata(self):
         stage1 = Path("scripts/run_stage1_prior.sh").read_text(encoding="utf-8")
@@ -19,10 +20,24 @@ class TestStageRunScripts(unittest.TestCase):
 
     def test_stage2_script_supports_stage1_checkpoint_handoff(self):
         stage2 = Path("scripts/run_stage2_text.sh").read_text(encoding="utf-8")
+        two_stage = Path("scripts/run_two_stage.sh").read_text(encoding="utf-8")
 
         self.assertIn("STAGE1_CKPT", stage2)
         self.assertIn("system.weights=", stage2)
         self.assertNotIn("resume=", stage2)
+        self.assertIn('STAGE1_CKPT="${OUTPUT_ROOT}/headstudio-stage1-prior/ckpts/last.ckpt"', two_stage)
+        self.assertIn('export STAGE1_CKPT', two_stage)
+        self.assertIn('bash scripts/run_stage2_text.sh', two_stage)
+
+    def test_two_stage_script_shares_tag_and_timestamp_across_stages(self):
+        two_stage = Path("scripts/run_two_stage.sh").read_text(encoding="utf-8")
+
+        self.assertIn('RUN_TAG="${RUN_TAG:-silver_haired_scientist_portrait}"', two_stage)
+        self.assertIn('RUN_TS="${RUN_TS:-$(date +%Y%m%d-%H%M%S)}"', two_stage)
+        self.assertIn('OUTPUT_ROOT="outputs/${RUN_TAG}${RUN_TS}"', two_stage)
+        self.assertIn('tag="${RUN_TAG}"', two_stage)
+        self.assertIn('timestamp="${RUN_TS}"', two_stage)
+        self.assertNotIn('@${RUN_TS}', two_stage)
 
     def test_stage_run_scripts_pin_bitsandbytes_to_torch_cuda(self):
         stage1 = Path("scripts/run_stage1_prior.sh").read_text(encoding="utf-8")

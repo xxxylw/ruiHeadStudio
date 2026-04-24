@@ -81,10 +81,12 @@ system:
   shape_update_end_step: 7000
   size_threshold: 60
   max_grad: 0.002 # 0.0002
+  densify_min_opacity: 0.02
   flame_gender: ${data.gender}
   prune_only_start_step: 2400 # 2400
   prune_only_end_step: 3300 # 3300
   prune_only_interval: 300 # 300
+  prune_only_min_opacity: 0.02
   prune_size_threshold: 0.002
   half_scheduler_max_step: 3000
   size_threshold_fix_step: 1500
@@ -118,8 +120,8 @@ system:
 
   loss:
     lambda_sds: 1.
-    lambda_sparsity: 1.
-    lambda_opaque: 0.0
+    lambda_sparsity: 0.1
+    lambda_opaque: 0.1
     lambda_position: 10.0
     lambda_scaling: 10.0
     lambda_shape: 0.0

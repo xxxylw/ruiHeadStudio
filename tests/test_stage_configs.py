@@ -56,6 +56,19 @@ class TestStageConfigs(unittest.TestCase):
         self.assertIn("human head", stage1.system.prompt_processor.prompt.lower())
         self.assertLess(stage1.system.loss.lambda_sds, stage2.system.loss.lambda_sds)
 
+    def test_stage_configs_bias_toward_more_opaque_head_geometry(self):
+        stage1 = OmegaConf.load("configs/headstudio_stage1_prior.yaml")
+        stage2 = OmegaConf.load("configs/headstudio_stage2_text.yaml")
+
+        self.assertEqual(stage1.system.loss.lambda_sparsity, 0.2)
+        self.assertEqual(stage2.system.loss.lambda_sparsity, 0.1)
+        self.assertEqual(stage1.system.loss.lambda_opaque, 0.05)
+        self.assertEqual(stage2.system.loss.lambda_opaque, 0.1)
+        self.assertEqual(stage1.system.densify_min_opacity, 0.02)
+        self.assertEqual(stage2.system.densify_min_opacity, 0.02)
+        self.assertEqual(stage1.system.prune_only_min_opacity, 0.02)
+        self.assertEqual(stage2.system.prune_only_min_opacity, 0.02)
+
     def test_stage_configs_use_prompt_first_trial_layout(self):
         stage1 = load_config(
             "configs/headstudio_stage1_prior.yaml",

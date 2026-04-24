@@ -11,6 +11,8 @@ class TestStage1TemporalLossConfig(unittest.TestCase):
         self.assertEqual(stage1.data.adjacent_frame_max_offset, 1)
         self.assertGreater(stage1.system.loss.lambda_anchor, 0.0)
         self.assertGreater(stage1.system.loss.lambda_temporal_xyz, 0.0)
+        self.assertGreater(stage1.system.loss.lambda_opaque, 0.0)
+        self.assertLess(stage1.system.loss.lambda_sparsity, 1.0)
 
 
 if __name__ == "__main__":
