@@ -138,6 +138,7 @@ class Head3DGSLKsRig(BaseLift3DSystem):
 
         images = []
         depths = []
+        alphas = []
         self.viewspace_point_list = []
 
         if self.cfg.training_w_animation:
@@ -158,14 +159,18 @@ class Head3DGSLKsRig(BaseLift3DSystem):
                 self.radii = torch.max(radii, self.radii)
 
             depth = render_pkg["depth_3dgs"]
+            alpha = render_pkg["alpha_3dgs"]
 
             depth = depth.permute(1, 2, 0)
+            alpha = alpha.permute(1, 2, 0)
             image = image.permute(1, 2, 0)
             images.append(image)
             depths.append(depth)
+            alphas.append(alpha)
 
         images = torch.stack(images, 0)
         depths = torch.stack(depths, 0)
+        alphas = torch.stack(alphas, 0)
         # depth_min = torch.amin(depths, dim=[1, 2, 3], keepdim=True)
         # depth_max = torch.amax(depths, dim=[1, 2, 3], keepdim=True)
         # depths = (depths - depth_min) / (depth_max - depth_min + 1e-10)
@@ -175,7 +180,7 @@ class Head3DGSLKsRig(BaseLift3DSystem):
 
         render_pkg["comp_rgb"] = images
         render_pkg["depth"] = depths
-        render_pkg["opacity"] = depths / (depths.max() + 1e-5)
+        render_pkg["opacity"] = alphas
 
         return {
             **render_pkg,

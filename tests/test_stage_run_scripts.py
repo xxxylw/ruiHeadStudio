@@ -39,6 +39,15 @@ class TestStageRunScripts(unittest.TestCase):
         self.assertIn('timestamp="${RUN_TS}"', two_stage)
         self.assertNotIn('@${RUN_TS}', two_stage)
 
+    def test_two_stage_default_stage2_prompt_avoids_unsupported_clothing(self):
+        two_stage = Path("scripts/run_two_stage.sh").read_text(encoding="utf-8").lower()
+
+        self.assertIn("head and neck only", two_stage)
+        self.assertIn("no clothing", two_stage)
+        self.assertIn("no collar", two_stage)
+        self.assertNotIn("turtleneck", two_stage)
+        self.assertNotIn("shallow depth of field", two_stage)
+
     def test_stage_run_scripts_pin_bitsandbytes_to_torch_cuda(self):
         stage1 = Path("scripts/run_stage1_prior.sh").read_text(encoding="utf-8")
         stage2 = Path("scripts/run_stage2_text.sh").read_text(encoding="utf-8")

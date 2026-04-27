@@ -6,8 +6,35 @@ import importlib.util
 import types
 from pathlib import Path
 
+from omegaconf import OmegaConf
+
 
 def load_config_module():
+    for resolver in (
+        "calc_exp_lr_decay_rate",
+        "add",
+        "sub",
+        "mul",
+        "div",
+        "idiv",
+        "basename",
+        "rmspace",
+        "tuple2",
+        "gt0",
+        "cmaxgt0",
+        "not",
+        "cmaxgt0orcmaxgt0",
+    ):
+        if OmegaConf.has_resolver(resolver):
+            OmegaConf.clear_resolver(resolver)
+
+    stubbed_modules = [
+        "threestudio",
+        "threestudio.utils",
+        "threestudio.utils.typing",
+    ]
+    previous_modules = {name: sys.modules.get(name) for name in stubbed_modules}
+
     threestudio_stub = types.ModuleType("threestudio")
     threestudio_stub.warn = lambda *args, **kwargs: None
 
@@ -28,7 +55,14 @@ def load_config_module():
     module = importlib.util.module_from_spec(spec)
     assert spec.loader is not None
     sys.modules[spec.name] = module
-    spec.loader.exec_module(module)
+    try:
+        spec.loader.exec_module(module)
+    finally:
+        for name in stubbed_modules:
+            if previous_modules[name] is None:
+                sys.modules.pop(name, None)
+            else:
+                sys.modules[name] = previous_modules[name]
     return module
 
 

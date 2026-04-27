@@ -602,13 +602,15 @@ class GaussianFlameModel(GaussianModel):
         self.densify_and_clone(grads, max_grad, extent)
         self.densify_and_split(grads, max_grad, extent)
 
+        prune_mask = (self.get_opacity < min_opacity).squeeze()
         if max_screen_size:
             big_points_vs = self.max_radii2D > max_screen_size
             big_points_ws = self.get_scaling.max(dim=1).values > 0.03 * extent  # 0.05
-            prune_mask = torch.logical_or(big_points_vs, big_points_ws)
-            print(f'{prune_mask.sum()} points are pruned')
+            prune_mask = torch.logical_or(prune_mask, torch.logical_or(big_points_vs, big_points_ws))
             print(f'max_radii2D: {big_points_vs.sum()} | scaling: {big_points_ws.sum()}')
-            self.prune_points(prune_mask)
+        print(f'{prune_mask.sum()} points are pruned')
+        print(f'opacity: {(self.get_opacity < min_opacity).sum()}')
+        self.prune_points(prune_mask)
 
         torch.cuda.empty_cache()
 

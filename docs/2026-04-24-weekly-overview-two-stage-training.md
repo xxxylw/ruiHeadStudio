@@ -427,7 +427,7 @@ bash scripts/run_two_stage.sh
 RUN_TAG=my_run \
 RUN_TS=$(date +%Y%m%d-%H%M%S) \
 STAGE1_PROMPT="a neutral photorealistic human head portrait, realistic skin, natural face, studio lighting" \
-STAGE2_PROMPT="a photorealistic DSLR portrait of a man in his thirties, short black hair, structured jawline, natural skin texture, subtle studio rim light, charcoal jacket, 85mm lens, shallow depth of field, neutral gray backdrop" \
+STAGE2_PROMPT="a realistic studio portrait of a weathered middle aged man, short dark hair with subtle gray, natural skin tone, defined cheekbones, calm focused expression, clean realistic face, matte skin, soft even studio lighting, plain dark gray background, head and neck only, no clothing, no collar" \
 STAGE1_MAX_STEPS=4000 \
 STAGE2_MAX_STEPS=10000 \
 bash scripts/run_two_stage.sh
@@ -498,3 +498,53 @@ bash scripts/run_two_stage.sh
    - 而不只是继续调现有的 sparsity / opaque 比例
 
 简化地说，下周的重点会从“把两阶段训练做出来”，转成“把两阶段训练调得更稳、更像、更厚实”。
+
+---
+
+## 10. 追加：`opacity_fix_weathered_architect` 实验复盘和 Stage2 收敛策略
+
+今天后面又基于 opacity / alpha 修复拉起了一轮完整两阶段实验：
+
+- 输出目录：
+  [outputs/opacity_fix_weathered_architect20260424-143620](/home/rui/of_work/code/ruiHeadStudio/.worktrees/feat/prior-curriculum-pipeline/outputs/opacity_fix_weathered_architect20260424-143620:1)
+- `stage2` 最终结果：
+  [headstudio-stage2-text/save](/home/rui/of_work/code/ruiHeadStudio/.worktrees/feat/prior-curriculum-pipeline/outputs/opacity_fix_weathered_architect20260424-143620/headstudio-stage2-text/save:1)
+
+这轮实际使用的 `stage2` prompt 是：
+
+```text
+a photorealistic DSLR portrait of a weathered architect in his forties, short dark hair with subtle gray at the temples, solid natural skin texture, defined cheekbones, calm focused expression, matte cotton charcoal turtleneck collar, realistic skin pores, soft studio key light, clean gray backdrop, 85mm lens, shallow depth of field
+```
+
+结果说明两件事：
+
+1. opacity / alpha 修复方向是有效的，人物整体不再像之前那样明显半透明。
+2. `stage2` 外观优化过强，导致保真度下降。衣领和脖子区域出现类似电视噪声的彩色高斯，鼻子附近也有局部闪烁。
+
+点云统计也支持这个判断：
+
+- `stage1` 最终约 `96k` 点，颜色 DC 最大值约 `2.97`
+- `stage2` 最终约 `297k` 点，颜色 DC 最大值约 `29.21`
+
+也就是说，这轮的主要问题已经不是单纯的 opacity，而是 `stage2` 在没有足够几何支持和稳定约束的区域里，把 2D diffusion 的高频纹理强行写进了 3DGS。
+
+具体根因：
+
+- 当前 FLAME / head 3DGS 主要支持头和脖子，没有真实衣服或领子几何；`turtleneck collar` 这类词会把衣服语义压到脖子和下方稀疏高斯上。
+- `realistic skin pores`、`85mm lens`、`shallow depth of field` 会鼓励强摄影高频细节，在 SDS 训练里容易变成彩色斑点。
+- 旧 `stage2` 默认是 `lambda_sds=1.0`、`use_nfsd=True`，同时没有 `lambda_anchor` / `lambda_temporal_xyz`，比 `stage1` 更容易追逐单帧外观而牺牲多视角和动态一致性。
+
+因此后续默认策略改成更保守的 `stage2`：
+
+- 默认关闭 `use_nfsd`
+- `lambda_sds` 从 `1.0` 降到 `0.6`
+- 给 `stage2` 加回轻量稳定项：
+  - `lambda_anchor: 0.2`
+  - `lambda_temporal_xyz: 0.02`
+- 默认 prompt 限制在当前几何能表达的范围内：
+
+```text
+a realistic studio portrait of a weathered middle aged man, short dark hair with subtle gray, natural skin tone, defined cheekbones, calm focused expression, clean realistic face, matte skin, soft even studio lighting, plain dark gray background, head and neck only, no clothing, no collar
+```
+
+这不是说后面永远不能做衣服，而是当前这条 FLAME-head 路线应该先把头和脖子稳定做保真。等头部、鼻子、脖子在动态测试里稳定后，再考虑引入 torso / collar 几何或语义 mask，而不是只靠 prompt 让高斯自己长出衣服。

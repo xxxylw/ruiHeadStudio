@@ -87,12 +87,12 @@ system:
   shape_update_end_step: 7000
   size_threshold: 60
   max_grad: 0.002 # 0.0002
-  densify_min_opacity: 0.02
+  densify_min_opacity: 0.05
   flame_gender: ${data.gender}
   prune_only_start_step: 2400 # 2400
   prune_only_end_step: 3300 # 3300
   prune_only_interval: 300 # 300
-  prune_only_min_opacity: 0.02
+  prune_only_min_opacity: 0.05
   prune_size_threshold: 0.002
   half_scheduler_max_step: 3000
   size_threshold_fix_step: 1500

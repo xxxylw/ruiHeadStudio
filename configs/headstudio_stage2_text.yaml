@@ -81,12 +81,12 @@ system:
   shape_update_end_step: 7000
   size_threshold: 60
   max_grad: 0.002 # 0.0002
-  densify_min_opacity: 0.02
+  densify_min_opacity: 0.05
   flame_gender: ${data.gender}
   prune_only_start_step: 2400 # 2400
   prune_only_end_step: 3300 # 3300
   prune_only_interval: 300 # 300
-  prune_only_min_opacity: 0.02
+  prune_only_min_opacity: 0.05
   prune_size_threshold: 0.002
   half_scheduler_max_step: 3000
   size_threshold_fix_step: 1500
@@ -103,13 +103,13 @@ system:
     condition_scale_depth: 0.8
     min_step_percent: 0.05
     max_step_percent: 0.8
-    use_nfsd: True
+    use_nfsd: False
     use_dsd: False
 
   prompt_processor_type: "stable-diffusion-prompt-processor"
   prompt_processor:
     pretrained_model_name_or_path: "stablediffusionapi/realistic-vision-51"
-    prompt: "Elon Musk, RAW photo, (high detailed skin:1.2), 8k uhd, dslr, soft lighting, high quality, film grain, Fujifilm XT3"
+    prompt: "a realistic studio portrait of a weathered middle aged man, short dark hair with subtle gray, natural skin tone, defined cheekbones, calm focused expression, clean realistic face, matte skin, soft even studio lighting, plain dark gray background, head and neck only, no clothing, no collar"
     negative_prompt: "shadow, dark face, eyeglass, glasses, noise,pattern, strange color, (deformed iris, deformed pupils, semi-realistic, cgi, 3d, render, sketch, cartoon, drawing, anime:1.4), text, close up, cropped, out of frame, worst quality, low quality, jpeg artifacts, ugly, duplicate, morbid, mutilated, poorly drawn face, mutation, deformed, blurry, dehydrated, bad anatomy, bad proportions, extra limbs, cloned face, disfigured, gross proportions,long neck"
 
   loggers:
@@ -119,7 +119,9 @@ system:
       name: None
 
   loss:
-    lambda_sds: 1.
+    lambda_sds: 0.6
+    lambda_anchor: 0.2
+    lambda_temporal_xyz: 0.02
     lambda_sparsity: 0.1
     lambda_opaque: 0.1
     lambda_position: 10.0

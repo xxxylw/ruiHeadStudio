@@ -4,7 +4,7 @@ set -euo pipefail
 RUN_TAG="${RUN_TAG:-silver_haired_scientist_portrait}"
 RUN_TS="${RUN_TS:-$(date +%Y%m%d-%H%M%S)}"
 STAGE1_PROMPT="${STAGE1_PROMPT:-a neutral photorealistic human head portrait, realistic skin, natural face, studio lighting}"
-STAGE2_PROMPT="${STAGE2_PROMPT:-a photorealistic DSLR portrait of a distinguished middle-aged scientist, silver hair, calm expression, realistic skin pores, subtle wrinkles, cinematic rim lighting, 85mm lens, shallow depth of field, studio backdrop}"
+STAGE2_PROMPT="${STAGE2_PROMPT:-a realistic studio portrait of a weathered middle aged man, short dark hair with subtle gray, natural skin tone, defined cheekbones, calm focused expression, clean realistic face, matte skin, soft even studio lighting, plain dark gray background, head and neck only, no clothing, no collar}"
 STAGE1_MAX_STEPS="${STAGE1_MAX_STEPS:-4000}"
 STAGE2_MAX_STEPS="${STAGE2_MAX_STEPS:-10000}"
 STAGE1_CKPT_INTERVAL="${STAGE1_CKPT_INTERVAL:-1000}"
