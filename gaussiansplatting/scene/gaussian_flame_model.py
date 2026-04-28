@@ -77,6 +77,7 @@ class GaussianFlameModel(GaussianModel):
         self._reye_pose = torch.zeros([1, 3], device=self.device)
         self._neck_pose = torch.zeros([1, 3], device=self.device)
         self._xyz_anchor = torch.empty(0, device=self.device)
+        self._faces = torch.empty((0, 3), dtype=torch.long, device=self.device)
 
     @property
     def get_shape(self):
@@ -259,10 +260,7 @@ class GaussianFlameModel(GaussianModel):
         vertices = flame_output.vertices.squeeze()
         faces = torch.tensor(flame_model.faces.astype(np.int32), dtype=torch.int32, device=self.device)
         # rescale and recenter
-        vmin = vertices.min(0)[0]
-        vmax = vertices.max(0)[0]
-        ori_center = (vmin + vmax) / 2
-        ori_scale = 0.6 / (vmax - vmin).max()
+        ori_center, ori_scale = self.compute_neutral_flame_frame(flame_scale)
         vertices = (vertices - ori_center) * ori_scale
         # coordinate system: opengl --> blender (switch y/z)
         vertices[:, [1, 2]] = vertices[:, [2, 1]]
@@ -307,6 +305,23 @@ class GaussianFlameModel(GaussianModel):
         self._rotation = nn.Parameter(rots.requires_grad_(True))
         self._opacity = nn.Parameter(opacities.requires_grad_(True))
         self.max_radii2D = torch.zeros((self.num_gs), device="cuda")
+
+    def compute_neutral_flame_frame(self, flame_scale: float):
+        flame_output = self.model(
+            betas=torch.zeros([1, self.num_betas], dtype=torch.float32, device=self.device),
+            expression=torch.zeros([1, self.num_expression], dtype=torch.float32, device=self.device),
+            return_verts=True,
+        )
+        vertices = flame_output.vertices.squeeze()
+        vmin = vertices.min(0)[0]
+        vmax = vertices.max(0)[0]
+        center = (vmin + vmax) / 2
+        scale = 0.6 / (vmax - vmin).max()
+        return center.detach(), scale.detach()
+
+    def restore_neutral_flame_frame(self, flame_scale: float):
+        self.flame_scale = flame_scale
+        self.center, self.scale = self.compute_neutral_flame_frame(flame_scale)
 
     def construct_list_of_attributes(self):
         l = ['x', 'y', 'z', 'nx', 'ny', 'nz']
@@ -356,6 +371,7 @@ class GaussianFlameModel(GaussianModel):
 
     def load_ply(self, path):
         plydata = PlyData.read(path)
+        self.restore_neutral_flame_frame(-10)
 
         xyz = np.stack((np.asarray(plydata.elements[0]["x"]),
                         np.asarray(plydata.elements[0]["y"]),

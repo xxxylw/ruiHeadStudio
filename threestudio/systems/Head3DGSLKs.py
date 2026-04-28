@@ -4,6 +4,7 @@ import numpy as np
 from plyfile import PlyData, PlyElement
 from dataclasses import dataclass, field
 from argparse import ArgumentParser, Namespace
+from pathlib import Path
 
 import torch
 import torch.nn.functional as F
@@ -93,6 +94,16 @@ class Head3DGSLKsRig(BaseLift3DSystem):
         if ref_cfg is not None and ref_cfg.get("enabled", False):
             self.reference_sheet = load_reference_sheet(ref_cfg.metadata_path)
             self.reference_targets = self._build_reference_targets(self.reference_sheet)
+
+    def post_configure(self) -> None:
+        if self.cfg.weights is None or self.gaussian.get_faces.numel() > 0:
+            return
+        weights_path = Path(self.cfg.weights)
+        run_dir = weights_path.parent.parent if weights_path.parent.name == "ckpts" else weights_path.parent
+        ply_path = run_dir / "save" / "last.ply"
+        if ply_path.exists():
+            threestudio.info(f"Loading FLAME Gaussian bindings from {ply_path}")
+            self.gaussian.load_ply(str(ply_path))
 
     def _read_reference_image(self, image_path):
         import cv2
