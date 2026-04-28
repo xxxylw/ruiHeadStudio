@@ -30,6 +30,11 @@ run_in_clean_env() {
 }
 
 POSE_METADATA_JSON="${POSE_METADATA_JSON:-./collection/ruiheadstudio/flame_collections/curriculum/train_pose_metadata.json}"
+REFERENCE_FIDELITY_ENABLED="${REFERENCE_FIDELITY_ENABLED:-false}"
+REFERENCE_METADATA="${REFERENCE_METADATA:-}"
+REFERENCE_LAMBDA_REF_PERSON="${REFERENCE_LAMBDA_REF_PERSON:-0.05}"
+REFERENCE_LAMBDA_REF_FACE="${REFERENCE_LAMBDA_REF_FACE:-0.2}"
+REFERENCE_LAMBDA_REF_TEMPORAL_FACE="${REFERENCE_LAMBDA_REF_TEMPORAL_FACE:-0.02}"
 if [[ "${FORCE_REBUILD_POSE_METADATA:-0}" == "1" || ! -f "$POSE_METADATA_JSON" ]]; then
   mkdir -p "$(dirname "$POSE_METADATA_JSON")"
   run_in_clean_env "$TRAIN_ENV_PREFIX/bin/python" scripts/build_pose_difficulty_metadata.py \
@@ -46,5 +51,10 @@ fi
 
 run_in_clean_env "$TRAIN_ENV_PREFIX/bin/python" launch.py --config configs/headstudio_stage2_text.yaml --train \
   "data.pose_metadata_inputs=['${POSE_METADATA_JSON}']" \
+  "system.reference_fidelity.enabled=${REFERENCE_FIDELITY_ENABLED}" \
+  "system.reference_fidelity.metadata_path=${REFERENCE_METADATA}" \
+  "system.loss.lambda_ref_person=${REFERENCE_LAMBDA_REF_PERSON}" \
+  "system.loss.lambda_ref_face=${REFERENCE_LAMBDA_REF_FACE}" \
+  "system.loss.lambda_ref_temporal_face=${REFERENCE_LAMBDA_REF_TEMPORAL_FACE}" \
   "${WEIGHTS_ARG[@]}" \
   "$@"

@@ -12,6 +12,7 @@ import threestudio
 # from threestudio.utils.poser import Skeleton
 from threestudio.systems.base import BaseLift3DSystem
 from threestudio.utils.ops import binary_cross_entropy, dot
+from threestudio.utils.reference_sheet import load_reference_sheet
 from threestudio.utils.typing import *
 
 from gaussiansplatting.gaussian_renderer import render
@@ -85,6 +86,67 @@ class Head3DGSLKsRig(BaseLift3DSystem):
             reduction = 'mean'
         self.smoothl1_position = torch.nn.SmoothL1Loss(beta=1.0, reduction=reduction)
         self.l1_scaling = torch.nn.L1Loss(reduction=reduction)
+        self.reference_sheet = None
+        self.reference_targets = None
+        ref_cfg = self.cfg.get("reference_fidelity", None)
+        if ref_cfg is not None and ref_cfg.get("enabled", False):
+            self.reference_sheet = load_reference_sheet(ref_cfg.metadata_path)
+            self.reference_targets = self._build_reference_targets(self.reference_sheet)
+
+    def _read_reference_image(self, image_path):
+        import cv2
+
+        image = cv2.imread(str(image_path), cv2.IMREAD_COLOR)
+        if image is None:
+            raise ValueError(f"Failed to read reference image: {image_path}")
+        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        return torch.from_numpy(image).float().to(self.device) / 255.0
+
+    def _crop_reference_image(self, image, crop):
+        x0, y0, x1, y1 = crop
+        height, width = image.shape[:2]
+        x0 = max(0, min(width - 1, x0))
+        y0 = max(0, min(height - 1, y0))
+        x1 = max(x0 + 1, min(width, x1))
+        y1 = max(y0 + 1, min(height, y1))
+        return image[y0:y1, x0:x1]
+
+    def _reference_region_stats(self, crop):
+        return {
+            "mean": crop.mean(dim=(0, 1)),
+            "std": crop.std(dim=(0, 1)),
+        }
+
+    def _build_reference_targets(self, reference_sheet):
+        weighted = {
+            "face_mean": [],
+            "face_std": [],
+            "person_mean": [],
+            "person_std": [],
+            "weights": [],
+        }
+        for ref in reference_sheet.references:
+            image = self._read_reference_image(ref.image_path)
+            face_stats = self._reference_region_stats(self._crop_reference_image(image, ref.face_crop))
+            person_stats = self._reference_region_stats(self._crop_reference_image(image, ref.person_crop))
+            weighted["face_mean"].append(face_stats["mean"])
+            weighted["face_std"].append(face_stats["std"])
+            weighted["person_mean"].append(person_stats["mean"])
+            weighted["person_std"].append(person_stats["std"])
+            weighted["weights"].append(float(ref.weight))
+
+        weights = torch.tensor(weighted["weights"], dtype=torch.float32, device=self.device)
+        weights = weights / weights.sum().clamp_min(1.0e-6)
+
+        def combine(values):
+            return (torch.stack(values, dim=0) * weights[:, None]).sum(dim=0)
+
+        return {
+            "face_mean": combine(weighted["face_mean"]).detach(),
+            "face_std": combine(weighted["face_std"]).detach(),
+            "person_mean": combine(weighted["person_mean"]).detach(),
+            "person_std": combine(weighted["person_std"]).detach(),
+        }
 
     def save_gif_to_file(self, images, output_file):
         with io.BytesIO() as writer:
@@ -292,6 +354,14 @@ class Head3DGSLKsRig(BaseLift3DSystem):
         loss_opaque = binary_cross_entropy(opacity_clamped, opacity_clamped)
         self.log("train/loss_opaque", loss_opaque)
         loss += loss_opaque * self.C(self.cfg.loss.lambda_opaque)
+        if self.reference_sheet is not None:
+            ref_losses = self.compute_reference_fidelity_losses(out, batch)
+            self.log("train/loss_ref_person", ref_losses["loss_ref_person"])
+            self.log("train/loss_ref_face", ref_losses["loss_ref_face"])
+            self.log("train/loss_ref_temporal_face", ref_losses["loss_ref_temporal_face"])
+            loss += ref_losses["loss_ref_person"] * self.C(self.cfg.loss.lambda_ref_person)
+            loss += ref_losses["loss_ref_face"] * self.C(self.cfg.loss.lambda_ref_face)
+            loss += ref_losses["loss_ref_temporal_face"] * self.C(self.cfg.loss.lambda_ref_temporal_face)
         if guidance_eval:
             self.guidance_evaluation_save(
                 out["comp_rgb"].detach()[: guidance_out["eval"]["bs"]],
@@ -300,6 +370,58 @@ class Head3DGSLKsRig(BaseLift3DSystem):
         for name, value in self.cfg.loss.items():
             self.log(f"train_params/{name}", self.C(value))
         return {"loss": loss}
+
+    def _relative_crop(self, images, box):
+        _, height, width, _ = images.shape
+        x0 = int(width * box[0])
+        y0 = int(height * box[1])
+        x1 = max(x0 + 1, int(width * box[2]))
+        y1 = max(y0 + 1, int(height * box[3]))
+        return images[:, y0:y1, x0:x1, :]
+
+    def _render_region_stats(self, crop):
+        return {
+            "mean": crop.mean(dim=(0, 1, 2)),
+            "std": crop.std(dim=(0, 1, 2)),
+        }
+
+    def compute_reference_fidelity_losses(self, out, batch):
+        images = out["comp_rgb"]
+        ref_cfg = self.cfg.reference_fidelity
+        start_step = int(ref_cfg.start_step)
+        end_step = int(ref_cfg.end_step)
+        if self.true_global_step < start_step or self.true_global_step > end_step:
+            zero = images.new_tensor(0.0)
+            return {
+                "loss_ref_person": zero,
+                "loss_ref_face": zero,
+                "loss_ref_temporal_face": zero,
+            }
+
+        face_crop = self._relative_crop(images, (0.25, 0.08, 0.75, 0.68))
+        person_crop = self._relative_crop(images, (0.15, 0.05, 0.85, 0.90))
+        face_stats = self._render_region_stats(face_crop)
+        person_stats = self._render_region_stats(person_crop)
+
+        loss_ref_face = F.smooth_l1_loss(face_stats["mean"], self.reference_targets["face_mean"])
+        loss_ref_face += F.smooth_l1_loss(face_stats["std"], self.reference_targets["face_std"])
+        loss_ref_person = F.smooth_l1_loss(person_stats["mean"], self.reference_targets["person_mean"])
+        loss_ref_person += F.smooth_l1_loss(person_stats["std"], self.reference_targets["person_std"])
+
+        if face_crop.shape[0] > 1:
+            loss_ref_temporal_face = (face_crop[1:] - face_crop[:-1]).abs().mean()
+        else:
+            loss_ref_temporal_face = images.new_tensor(0.0)
+
+        loss_ref_face = loss_ref_face * float(ref_cfg.get("face_weight", 1.0))
+        loss_ref_person = loss_ref_person * float(ref_cfg.get("person_weight", 0.25))
+        loss_ref_temporal_face = loss_ref_temporal_face * float(ref_cfg.get("temporal_face_weight", 0.1))
+
+        return {
+            "loss_ref_person": loss_ref_person,
+            "loss_ref_face": loss_ref_face,
+            "loss_ref_temporal_face": loss_ref_temporal_face,
+        }
 
     def on_before_optimizer_step(self, optimizer):
 

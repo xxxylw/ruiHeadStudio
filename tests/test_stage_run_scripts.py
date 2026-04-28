@@ -88,6 +88,14 @@ class TestStageRunScripts(unittest.TestCase):
         self.assertIn('export PATH="$TRAIN_ENV_PREFIX/bin:$CUDA_HOME/bin:/usr/bin:/bin"', stage1)
         self.assertIn('export PATH="$TRAIN_ENV_PREFIX/bin:$CUDA_HOME/bin:/usr/bin:/bin"', stage2)
 
+    def test_fidelity_eval_script_uses_fixed_animation_protocol(self):
+        script = Path("scripts/render_fidelity_eval.sh").read_text(encoding="utf-8")
+
+        self.assertIn("FIDELITY_CKPT", script)
+        self.assertIn("configs/headstudio_stage2_text.yaml", script)
+        self.assertIn("trainer.max_steps=1", script)
+        self.assertIn("--test", script)
+
 
 if __name__ == "__main__":
     unittest.main()

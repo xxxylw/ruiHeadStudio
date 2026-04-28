@@ -95,6 +95,16 @@ system:
   area_relax: False
   training_w_animation: ${data.training_w_animation}
 
+  reference_fidelity:
+    enabled: false
+    metadata_path: ""
+    image_size: 224
+    start_step: 1200
+    end_step: ${trainer.max_steps}
+    face_weight: 1.0
+    person_weight: 0.25
+    temporal_face_weight: 0.1
+
   guidance_type: "controlnet-depth-guidance"
   guidance:
     pretrained_model_name_or_path: "stablediffusionapi/realistic-vision-51"
@@ -124,6 +134,9 @@ system:
     lambda_temporal_xyz: 0.02
     lambda_sparsity: 0.1
     lambda_opaque: 0.1
+    lambda_ref_person: 0.0
+    lambda_ref_face: 0.0
+    lambda_ref_temporal_face: 0.0
     lambda_position: 10.0
     lambda_scaling: 10.0
     lambda_shape: 0.0
