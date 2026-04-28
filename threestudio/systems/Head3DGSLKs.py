@@ -55,6 +55,7 @@ class Head3DGSLKsRig(BaseLift3DSystem):
         area_relax: bool = False
         shape_update_end_step: int = 12000
         training_w_animation: bool = True
+        reference_fidelity: dict = field(default_factory=dict)
 
         # area scaling factor
         # area_scaling_factor: float = 1
@@ -402,11 +403,15 @@ class Head3DGSLKsRig(BaseLift3DSystem):
         person_crop = self._relative_crop(images, (0.15, 0.05, 0.85, 0.90))
         face_stats = self._render_region_stats(face_crop)
         person_stats = self._render_region_stats(person_crop)
+        reference_targets = {
+            name: target.to(device=images.device, dtype=images.dtype)
+            for name, target in self.reference_targets.items()
+        }
 
-        loss_ref_face = F.smooth_l1_loss(face_stats["mean"], self.reference_targets["face_mean"])
-        loss_ref_face += F.smooth_l1_loss(face_stats["std"], self.reference_targets["face_std"])
-        loss_ref_person = F.smooth_l1_loss(person_stats["mean"], self.reference_targets["person_mean"])
-        loss_ref_person += F.smooth_l1_loss(person_stats["std"], self.reference_targets["person_std"])
+        loss_ref_face = F.smooth_l1_loss(face_stats["mean"], reference_targets["face_mean"])
+        loss_ref_face += F.smooth_l1_loss(face_stats["std"], reference_targets["face_std"])
+        loss_ref_person = F.smooth_l1_loss(person_stats["mean"], reference_targets["person_mean"])
+        loss_ref_person += F.smooth_l1_loss(person_stats["std"], reference_targets["person_std"])
 
         if face_crop.shape[0] > 1:
             loss_ref_temporal_face = (face_crop[1:] - face_crop[:-1]).abs().mean()

@@ -32,8 +32,10 @@ class TestReferenceFidelityConfig(unittest.TestCase):
         source = Path("threestudio/systems/Head3DGSLKs.py").read_text(encoding="utf-8")
 
         self.assertIn("load_reference_sheet", source)
+        self.assertIn("reference_fidelity: dict", source)
         self.assertIn("self.reference_sheet", source)
         self.assertIn("compute_reference_fidelity_losses", source)
+        self.assertIn("target.to(device=images.device, dtype=images.dtype)", source)
         self.assertIn("train/loss_ref_person", source)
         self.assertIn("train/loss_ref_face", source)
         self.assertIn("train/loss_ref_temporal_face", source)
