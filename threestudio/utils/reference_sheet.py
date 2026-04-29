@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable, Tuple
+from typing import Iterable, Optional, Tuple
 
 
 ALLOWED_IDENTITY_MODES = {"fictional", "target_person"}
@@ -17,6 +17,8 @@ class ReferenceImage:
     weight: float
     face_crop: Tuple[int, int, int, int]
     person_crop: Tuple[int, int, int, int]
+    neck_crop: Optional[Tuple[int, int, int, int]] = None
+    global_crop: Optional[Tuple[int, int, int, int]] = None
 
 
 @dataclass(frozen=True)
@@ -37,11 +39,17 @@ def _as_box(value: Iterable[int], field_name: str) -> Tuple[int, int, int, int]:
     return box
 
 
-def load_reference_sheet(metadata_path: str | Path) -> ReferenceSheet:
-    metadata_path = Path(metadata_path)
-    root = metadata_path.parent
-    data = json.loads(metadata_path.read_text(encoding="utf-8"))
+def _optional_box(value, field_name: str) -> Optional[Tuple[int, int, int, int]]:
+    if value is None:
+        return None
+    return _as_box(value, field_name)
 
+
+def load_reference_sheet_from_metadata(
+    data: dict,
+    root: Path,
+    require_images: bool = False,
+) -> ReferenceSheet:
     identity_mode = data.get("identity_mode", "fictional")
     if identity_mode not in ALLOWED_IDENTITY_MODES:
         raise ValueError(f"identity_mode must be one of {sorted(ALLOWED_IDENTITY_MODES)}")
@@ -53,7 +61,7 @@ def load_reference_sheet(metadata_path: str | Path) -> ReferenceSheet:
     references = []
     for index, item in enumerate(data.get("references", [])):
         image_path = root / item["image"]
-        if not image_path.exists():
+        if require_images and not image_path.exists():
             raise FileNotFoundError(f"reference image missing at index {index}: {image_path}")
         view = item.get("view", "front")
         if view not in ALLOWED_VIEWS:
@@ -66,6 +74,8 @@ def load_reference_sheet(metadata_path: str | Path) -> ReferenceSheet:
                 weight=float(item.get("weight", 1.0)),
                 face_crop=face_crop,
                 person_crop=_as_box(item.get("person_crop", face_crop), "person_crop"),
+                neck_crop=_optional_box(item.get("neck_crop"), "neck_crop"),
+                global_crop=_optional_box(item.get("global_crop"), "global_crop"),
             )
         )
 
@@ -78,3 +88,10 @@ def load_reference_sheet(metadata_path: str | Path) -> ReferenceSheet:
         prompt=prompt,
         references=tuple(references),
     )
+
+
+def load_reference_sheet(metadata_path: str | Path) -> ReferenceSheet:
+    metadata_path = Path(metadata_path)
+    root = metadata_path.parent
+    data = json.loads(metadata_path.read_text(encoding="utf-8"))
+    return load_reference_sheet_from_metadata(data, root, require_images=True)

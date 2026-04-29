@@ -17,7 +17,9 @@ def load_reference_module():
     return module
 
 
-load_reference_sheet = load_reference_module().load_reference_sheet
+reference_module = load_reference_module()
+load_reference_sheet = reference_module.load_reference_sheet
+load_reference_sheet_from_metadata = reference_module.load_reference_sheet_from_metadata
 
 
 class TestReferenceSheet(unittest.TestCase):
@@ -96,6 +98,28 @@ class TestReferenceSheet(unittest.TestCase):
 
             self.assertIn("identity_mode: target_person", result.stdout)
             self.assertIn("references: 1", result.stdout)
+
+    def test_reference_sheet_supports_optional_neck_and_global_crops(self):
+        metadata = {
+            "identity_mode": "target_person",
+            "prompt": "Cristiano Ronaldo generated reference",
+            "references": [
+                {
+                    "image": "reference_sheet.png",
+                    "view": "front",
+                    "weight": 1.0,
+                    "face_crop": [1, 2, 3, 4],
+                    "person_crop": [5, 6, 7, 8],
+                    "neck_crop": [9, 10, 11, 12],
+                    "global_crop": [13, 14, 15, 16],
+                }
+            ],
+        }
+
+        sheet = load_reference_sheet_from_metadata(metadata, Path("/tmp/reference"))
+
+        self.assertEqual(sheet.references[0].neck_crop, (9, 10, 11, 12))
+        self.assertEqual(sheet.references[0].global_crop, (13, 14, 15, 16))
 
 
 if __name__ == "__main__":

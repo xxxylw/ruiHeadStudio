@@ -413,9 +413,15 @@ class Head3DGSLKsRig(BaseLift3DSystem):
             self.log("train/loss_ref_person", ref_losses["loss_ref_person"])
             self.log("train/loss_ref_face", ref_losses["loss_ref_face"])
             self.log("train/loss_ref_temporal_face", ref_losses["loss_ref_temporal_face"])
+            self.log("train/loss_ref_face_feature", ref_losses["loss_ref_face_feature"])
+            self.log("train/loss_ref_person_feature", ref_losses["loss_ref_person_feature"])
+            self.log("train/loss_ref_identity", ref_losses["loss_ref_identity"])
             loss += ref_losses["loss_ref_person"] * self.C(self.cfg.loss.lambda_ref_person)
             loss += ref_losses["loss_ref_face"] * self.C(self.cfg.loss.lambda_ref_face)
             loss += ref_losses["loss_ref_temporal_face"] * self.C(self.cfg.loss.lambda_ref_temporal_face)
+            loss += ref_losses["loss_ref_face_feature"] * self.C(self.cfg.loss.lambda_ref_face_feature)
+            loss += ref_losses["loss_ref_person_feature"] * self.C(self.cfg.loss.lambda_ref_person_feature)
+            loss += ref_losses["loss_ref_identity"] * self.C(self.cfg.loss.lambda_ref_identity)
         if guidance_eval:
             self.guidance_evaluation_save(
                 out["comp_rgb"].detach()[: guidance_out["eval"]["bs"]],
@@ -450,6 +456,9 @@ class Head3DGSLKsRig(BaseLift3DSystem):
                 "loss_ref_person": zero,
                 "loss_ref_face": zero,
                 "loss_ref_temporal_face": zero,
+                "loss_ref_face_feature": zero,
+                "loss_ref_person_feature": zero,
+                "loss_ref_identity": zero,
             }
 
         face_crop = self._relative_crop(images, (0.25, 0.08, 0.75, 0.68))
@@ -479,6 +488,9 @@ class Head3DGSLKsRig(BaseLift3DSystem):
             "loss_ref_person": loss_ref_person,
             "loss_ref_face": loss_ref_face,
             "loss_ref_temporal_face": loss_ref_temporal_face,
+            "loss_ref_face_feature": images.new_tensor(0.0),
+            "loss_ref_person_feature": images.new_tensor(0.0),
+            "loss_ref_identity": images.new_tensor(0.0),
         }
 
     def build_region_min_opacity(self, base_min_opacity):

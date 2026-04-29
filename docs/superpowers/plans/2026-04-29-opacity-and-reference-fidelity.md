@@ -823,7 +823,7 @@ For `prune_only`:
                     )
 ```
 
-- [ ] **Step 4: Run tests**
+- [x] **Step 4: Run tests**
 
 Run:
 
@@ -837,7 +837,7 @@ Expected:
 OK
 ```
 
-- [ ] **Step 5: Commit Task 5**
+- [x] **Step 5: Commit Task 5**
 
 Run:
 
@@ -857,7 +857,7 @@ git commit -m "接入后脑勺分区 prune guard"
 - Test: `tests/test_reference_sheet.py`
 - Test: `tests/test_reference_fidelity_config.py`
 
-- [ ] **Step 1: Add failing tests for optional neck/global crops and feature config**
+- [x] **Step 1: Add failing tests for optional neck/global crops and feature config**
 
 Append to `tests/test_reference_fidelity_config.py`:
 
@@ -907,7 +907,7 @@ Append to `tests/test_reference_sheet.py`:
 
 If `load_reference_sheet_from_metadata` does not exist yet, first expose it from current parsing code rather than duplicating parser logic.
 
-- [ ] **Step 2: Run tests and verify failure**
+- [x] **Step 2: Run tests and verify failure**
 
 Run:
 
@@ -921,7 +921,7 @@ Expected:
 FAIL
 ```
 
-- [ ] **Step 3: Extend reference sheet dataclass and parser**
+- [x] **Step 3: Extend reference sheet dataclass and parser**
 
 In `threestudio/utils/reference_sheet.py`, add optional fields to the reference item dataclass:
 
@@ -946,7 +946,7 @@ neck_crop: Optional[List[int]] = None
 global_crop: Optional[List[int]] = None
 ```
 
-- [ ] **Step 4: Add disabled feature-loss config skeleton**
+- [x] **Step 4: Add disabled feature-loss config skeleton**
 
 In `configs/headstudio_stage2_text.yaml`, under `system.reference_fidelity:`, add:
 
@@ -967,7 +967,7 @@ Under `system.loss:`, add:
     lambda_ref_identity: 0.0
 ```
 
-- [ ] **Step 5: Add zero-valued placeholder hooks in reference losses**
+- [x] **Step 5: Add zero-valued placeholder hooks in reference losses**
 
 In `compute_reference_fidelity_losses`, include zero values in the early return:
 
@@ -998,7 +998,7 @@ In `training_step`, when `self.reference_sheet is not None`, log them:
 
 This task only creates the disabled config and logging surface. Actual DINO/CLIP/ArcFace backbones are separate follow-up tasks after opacity repair is validated.
 
-- [ ] **Step 6: Run tests**
+- [x] **Step 6: Run tests**
 
 Run:
 

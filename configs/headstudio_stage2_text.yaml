@@ -115,6 +115,12 @@ system:
     face_weight: 1.0
     person_weight: 0.25
     temporal_face_weight: 0.1
+    feature_loss:
+      enabled: false
+      backbone: dino
+    identity_loss:
+      enabled: false
+      backbone: arcface
 
   guidance_type: "controlnet-depth-guidance"
   guidance:
@@ -150,6 +156,9 @@ system:
     lambda_ref_person: 0.0
     lambda_ref_face: 0.0
     lambda_ref_temporal_face: 0.0
+    lambda_ref_face_feature: 0.0
+    lambda_ref_person_feature: 0.0
+    lambda_ref_identity: 0.0
     lambda_position: 10.0
     lambda_scaling: 10.0
     lambda_shape: 0.0

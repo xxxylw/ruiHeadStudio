@@ -40,6 +40,23 @@ class TestReferenceFidelityConfig(unittest.TestCase):
         self.assertIn("train/loss_ref_face", source)
         self.assertIn("train/loss_ref_temporal_face", source)
 
+    def test_stage2_reference_feature_loss_defaults_are_disabled(self):
+        cfg = Path("configs/headstudio_stage2_text.yaml").read_text(encoding="utf-8")
+
+        self.assertIn("feature_loss:", cfg)
+        self.assertIn("backbone: dino", cfg)
+        self.assertIn("lambda_ref_face_feature: 0.0", cfg)
+        self.assertIn("lambda_ref_person_feature: 0.0", cfg)
+        self.assertIn("identity_loss:", cfg)
+        self.assertIn("lambda_ref_identity: 0.0", cfg)
+
+    def test_head_system_contains_reference_feature_config_hooks(self):
+        source = Path("threestudio/systems/Head3DGSLKs.py").read_text(encoding="utf-8")
+
+        self.assertIn("loss_ref_face_feature", source)
+        self.assertIn("loss_ref_person_feature", source)
+        self.assertIn("loss_ref_identity", source)
+
 
 if __name__ == "__main__":
     unittest.main()
