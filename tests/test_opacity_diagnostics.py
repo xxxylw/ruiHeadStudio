@@ -1,6 +1,7 @@
 import unittest
 import importlib.util
 import sys
+import tempfile
 from pathlib import Path
 
 import torch
@@ -82,6 +83,63 @@ class TestOpacityDiagnostics(unittest.TestCase):
         self.assertAlmostEqual(
             summary["regions"]["rear"]["opacity"]["mean"], 0.35, places=6
         )
+
+
+def load_opacity_cli_module():
+    module_path = (
+        Path(__file__).resolve().parents[1] / "scripts" / "diagnose_opacity_thickness.py"
+    )
+    spec = importlib.util.spec_from_file_location("diagnose_opacity_thickness_module", module_path)
+    module = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+class TestOpacityDiagnosticsCli(unittest.TestCase):
+    def test_diagnostics_script_has_expected_cli_arguments(self):
+        source = Path("scripts/diagnose_opacity_thickness.py").read_text(encoding="utf-8")
+
+        self.assertIn("--ply", source)
+        self.assertIn("--output", source)
+        self.assertIn("gaussian_region_stats.json", source)
+        self.assertIn("summary.md", source)
+
+    def test_write_summary_markdown_writes_region_counts(self):
+        write_summary_markdown = load_opacity_cli_module().write_summary_markdown
+        with tempfile.TemporaryDirectory() as tmp:
+            output = Path(tmp) / "summary.md"
+            stats = {
+                "total": {
+                    "count": 3,
+                    "opacity": {"mean": 0.5},
+                    "scaling_max": {"mean": 0.2},
+                },
+                "regions": {
+                    "front": {
+                        "count": 1,
+                        "opacity": {"mean": 0.9},
+                        "scaling_max": {"mean": 0.1},
+                    },
+                    "side": {
+                        "count": 0,
+                        "opacity": {"mean": None},
+                        "scaling_max": {"mean": None},
+                    },
+                    "rear": {
+                        "count": 2,
+                        "opacity": {"mean": 0.3},
+                        "scaling_max": {"mean": 0.4},
+                    },
+                },
+            }
+
+            write_summary_markdown(output, stats)
+
+            text = output.read_text(encoding="utf-8")
+            self.assertIn("# Opacity Thickness Diagnostics", text)
+            self.assertIn("| rear | 2 | 0.300000 | 0.400000 |", text)
 
 
 if __name__ == "__main__":

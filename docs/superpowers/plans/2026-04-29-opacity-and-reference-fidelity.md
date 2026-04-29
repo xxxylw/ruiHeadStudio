@@ -408,7 +408,7 @@ Expected:
 OK
 ```
 
-- [ ] **Step 5: Commit Task 2**
+- [x] **Step 5: Commit Task 2**
 
 Run:
 
@@ -425,7 +425,7 @@ git commit -m "添加高斯区域分类与分区 prune 接口"
 - Create: `scripts/diagnose_opacity_thickness.py`
 - Test: `tests/test_opacity_diagnostics.py`
 
-- [ ] **Step 1: Extend tests for CLI source and summary writer**
+- [x] **Step 1: Extend tests for CLI source and summary writer**
 
 Append to `tests/test_opacity_diagnostics.py`:
 
@@ -464,7 +464,7 @@ class TestOpacityDiagnosticsCli(unittest.TestCase):
             self.assertIn("| rear | 2 | 0.300000 | 0.400000 |", text)
 ```
 
-- [ ] **Step 2: Run tests and verify failure**
+- [x] **Step 2: Run tests and verify failure**
 
 Run:
 
@@ -478,7 +478,7 @@ Expected:
 ModuleNotFoundError: No module named 'scripts.diagnose_opacity_thickness'
 ```
 
-- [ ] **Step 3: Implement CLI**
+- [x] **Step 3: Implement CLI**
 
 Create `scripts/diagnose_opacity_thickness.py`:
 
@@ -568,7 +568,7 @@ if __name__ == "__main__":
 
 This first CLI reads PLY stats without GPU. Region labels are `unknown` until Task 4 wires model-based face normal classification.
 
-- [ ] **Step 4: Run tests**
+- [x] **Step 4: Run tests**
 
 Run:
 
