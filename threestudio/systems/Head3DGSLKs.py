@@ -481,6 +481,17 @@ class Head3DGSLKsRig(BaseLift3DSystem):
             "loss_ref_temporal_face": loss_ref_temporal_face,
         }
 
+    def build_region_min_opacity(self, base_min_opacity):
+        cfg = self.cfg.get("prune_region_guard", {})
+        if not cfg.get("enabled", False):
+            return None
+        rear_scale = float(cfg.get("rear_min_opacity_scale", 0.5))
+        return {
+            "front": float(base_min_opacity),
+            "side": float(base_min_opacity),
+            "rear": float(base_min_opacity) * rear_scale,
+        }
+
     def on_before_optimizer_step(self, optimizer):
 
         # return
@@ -499,11 +510,13 @@ class Head3DGSLKsRig(BaseLift3DSystem):
 
                 if self.true_global_step > self.cfg.densify_prune_start_step and self.true_global_step % self.cfg.densify_prune_interval == 0:  # 500 100
                     size_threshold = self.cfg.size_threshold if self.true_global_step > self.cfg.size_threshold_fix_step else None  # 3000
+                    region_min_opacity = self.build_region_min_opacity(self.cfg.densify_min_opacity)
                     self.gaussian.densify_and_prune(
                         self.cfg.max_grad,
                         self.cfg.densify_min_opacity,
                         self.cameras_extent,
                         size_threshold,
+                        region_min_opacity=region_min_opacity,
                     )
 
                     # prune-only phase according to Gaussian size, rather than the stochastic gradient to eliminate floating artifacts.
@@ -518,9 +531,11 @@ class Head3DGSLKsRig(BaseLift3DSystem):
                 self.gaussian.add_densification_stats(viewspace_point_tensor_grad, self.visibility_filter)
 
                 if self.true_global_step % self.cfg.prune_only_interval == 0:
+                    region_min_opacity = self.build_region_min_opacity(self.cfg.prune_only_min_opacity)
                     self.gaussian.prune_only(
                         min_opacity=self.cfg.prune_only_min_opacity,
                         extent=self.cameras_extent,
+                        region_min_opacity=region_min_opacity,
                     )
 
             if self.true_global_step > self.cfg.shape_update_end_step:

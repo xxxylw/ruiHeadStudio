@@ -735,7 +735,7 @@ Expected:
 OK
 ```
 
-- [ ] **Step 6: Commit Task 4**
+- [x] **Step 6: Commit Task 4**
 
 Run:
 
@@ -752,7 +752,7 @@ git commit -m "加入默认关闭的 opacity 修复配置"
 - Modify: `threestudio/systems/Head3DGSLKs.py`
 - Test: `tests/test_opacity_alpha_pipeline.py`
 
-- [ ] **Step 1: Add failing source test for prune guard wiring**
+- [x] **Step 1: Add failing source test for prune guard wiring**
 
 Append to `tests/test_opacity_alpha_pipeline.py`:
 
@@ -766,7 +766,7 @@ Append to `tests/test_opacity_alpha_pipeline.py`:
         self.assertIn("region_min_opacity=region_min_opacity", source)
 ```
 
-- [ ] **Step 2: Run test and verify failure**
+- [x] **Step 2: Run test and verify failure**
 
 Run:
 
@@ -780,7 +780,7 @@ Expected:
 FAIL: test_head_system_passes_region_min_opacity_to_prune
 ```
 
-- [ ] **Step 3: Implement prune threshold builder**
+- [x] **Step 3: Implement prune threshold builder**
 
 Add method to `Head3DGSLKsRig` before `on_before_optimizer_step`:
 

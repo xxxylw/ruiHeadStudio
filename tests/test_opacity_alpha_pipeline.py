@@ -53,6 +53,14 @@ class TestOpacityAlphaPipeline(unittest.TestCase):
         self.assertIn("train/loss_opacity_coverage", source)
         self.assertIn("train/loss_rear_opacity", source)
 
+    def test_head_system_passes_region_min_opacity_to_prune(self):
+        source = (REPO_ROOT / "threestudio" / "systems" / "Head3DGSLKs.py").read_text(
+            encoding="utf-8"
+        )
+
+        self.assertIn("build_region_min_opacity", source)
+        self.assertIn("region_min_opacity=region_min_opacity", source)
+
 
 if __name__ == "__main__":
     unittest.main()
