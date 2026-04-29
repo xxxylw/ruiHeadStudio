@@ -57,6 +57,9 @@ class Head3DGSLKsRig(BaseLift3DSystem):
         shape_update_end_step: int = 12000
         training_w_animation: bool = True
         reference_fidelity: dict = field(default_factory=dict)
+        opacity_coverage: dict = field(default_factory=dict)
+        rear_opacity: dict = field(default_factory=dict)
+        prune_region_guard: dict = field(default_factory=dict)
 
         # area scaling factor
         # area_scaling_factor: float = 1
@@ -268,6 +271,32 @@ class Head3DGSLKsRig(BaseLift3DSystem):
         )
         self.guidance = threestudio.find(self.cfg.guidance_type)(self.cfg.guidance)
 
+    def compute_opacity_coverage_loss(self, out):
+        cfg = self.cfg.get("opacity_coverage", {})
+        if not cfg.get("enabled", False):
+            return out["opacity"].new_tensor(0.0)
+        opacity = out["opacity"]
+        min_alpha = float(cfg.get("min_alpha", 0.85))
+        return F.relu(opacity.new_tensor(min_alpha) - opacity).mean()
+
+    def compute_rear_opacity_loss(self):
+        cfg = self.cfg.get("rear_opacity", {})
+        if not cfg.get("enabled", False):
+            return self.gaussian.get_opacity.new_tensor(0.0)
+        labels = self.gaussian.get_gaussian_region_labels()
+        if not labels:
+            return self.gaussian.get_opacity.new_tensor(0.0)
+        rear_mask = torch.tensor(
+            [label == "rear" for label in labels],
+            dtype=torch.bool,
+            device=self.gaussian.get_opacity.device,
+        )
+        if not rear_mask.any():
+            return self.gaussian.get_opacity.new_tensor(0.0)
+        min_mean_opacity = float(cfg.get("min_mean_opacity", 0.35))
+        rear_mean = self.gaussian.get_opacity.squeeze()[rear_mask].mean()
+        return F.relu(rear_mean.new_tensor(min_mean_opacity) - rear_mean)
+
     def training_step(self, batch, batch_idx):
 
         self.gaussian.update_learning_rate(self.true_global_step)
@@ -366,6 +395,19 @@ class Head3DGSLKsRig(BaseLift3DSystem):
         loss_opaque = binary_cross_entropy(opacity_clamped, opacity_clamped)
         self.log("train/loss_opaque", loss_opaque)
         loss += loss_opaque * self.C(self.cfg.loss.lambda_opaque)
+
+        lambda_opacity_coverage = self.cfg.loss.get("lambda_opacity_coverage", 0.0)
+        if lambda_opacity_coverage > 0.0:
+            loss_opacity_coverage = self.compute_opacity_coverage_loss(out)
+            self.log("train/loss_opacity_coverage", loss_opacity_coverage)
+            loss += loss_opacity_coverage * self.C(lambda_opacity_coverage)
+
+        lambda_rear_opacity = self.cfg.loss.get("lambda_rear_opacity", 0.0)
+        if lambda_rear_opacity > 0.0:
+            loss_rear_opacity = self.compute_rear_opacity_loss()
+            self.log("train/loss_rear_opacity", loss_rear_opacity)
+            loss += loss_rear_opacity * self.C(lambda_rear_opacity)
+
         if self.reference_sheet is not None:
             ref_losses = self.compute_reference_fidelity_losses(out, batch)
             self.log("train/loss_ref_person", ref_losses["loss_ref_person"])

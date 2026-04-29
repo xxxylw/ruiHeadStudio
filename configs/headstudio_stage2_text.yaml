@@ -95,6 +95,17 @@ system:
   area_relax: False
   training_w_animation: ${data.training_w_animation}
 
+  opacity_coverage:
+    enabled: false
+    min_alpha: 0.85
+    mode: head_region
+  rear_opacity:
+    enabled: false
+    min_mean_opacity: 0.35
+  prune_region_guard:
+    enabled: false
+    rear_min_opacity_scale: 0.5
+
   reference_fidelity:
     enabled: false
     metadata_path: ""
@@ -134,6 +145,8 @@ system:
     lambda_temporal_xyz: 0.02
     lambda_sparsity: 0.1
     lambda_opaque: 0.1
+    lambda_opacity_coverage: 0.0
+    lambda_rear_opacity: 0.0
     lambda_ref_person: 0.0
     lambda_ref_face: 0.0
     lambda_ref_temporal_face: 0.0

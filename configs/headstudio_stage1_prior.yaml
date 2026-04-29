@@ -101,6 +101,17 @@ system:
   area_relax: False
   training_w_animation: ${data.training_w_animation}
 
+  opacity_coverage:
+    enabled: false
+    min_alpha: 0.85
+    mode: head_region
+  rear_opacity:
+    enabled: false
+    min_mean_opacity: 0.35
+  prune_region_guard:
+    enabled: false
+    rear_min_opacity_scale: 0.5
+
   guidance_type: "controlnet-depth-guidance"
   guidance:
     pretrained_model_name_or_path: "stablediffusionapi/realistic-vision-51"
@@ -130,6 +141,8 @@ system:
     lambda_temporal_xyz: 0.1
     lambda_sparsity: 0.2
     lambda_opaque: 0.05
+    lambda_opacity_coverage: 0.0
+    lambda_rear_opacity: 0.0
     lambda_position: 10.0
     lambda_scaling: 10.0
     lambda_shape: 0.0

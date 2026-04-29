@@ -582,7 +582,7 @@ Expected:
 OK
 ```
 
-- [ ] **Step 5: Commit Task 3**
+- [x] **Step 5: Commit Task 3**
 
 Run:
 
@@ -601,7 +601,7 @@ git commit -m "添加 opacity 厚实度诊断脚本"
 - Modify: `configs/headstudio_stage2_text.yaml`
 - Test: `tests/test_opacity_alpha_pipeline.py`
 
-- [ ] **Step 1: Add failing source tests for config and hooks**
+- [x] **Step 1: Add failing source tests for config and hooks**
 
 Append to `tests/test_opacity_alpha_pipeline.py`:
 
@@ -631,7 +631,7 @@ Append to `tests/test_opacity_alpha_pipeline.py`:
         self.assertIn("train/loss_rear_opacity", source)
 ```
 
-- [ ] **Step 2: Run tests and verify failure**
+- [x] **Step 2: Run tests and verify failure**
 
 Run:
 
@@ -645,7 +645,7 @@ Expected:
 FAIL: test_stage_configs_define_disabled_opacity_repair_defaults
 ```
 
-- [ ] **Step 3: Add config dataclass fields and loss helpers**
+- [x] **Step 3: Add config dataclass fields and loss helpers**
 
 Modify `Head3DGSLKsRig.Config` in `threestudio/systems/Head3DGSLKs.py`:
 
@@ -697,7 +697,7 @@ In `training_step`, after `loss_opaque`:
             loss += loss_rear_opacity * self.C(lambda_rear_opacity)
 ```
 
-- [ ] **Step 4: Add disabled defaults to both stage configs**
+- [x] **Step 4: Add disabled defaults to both stage configs**
 
 In both stage YAML files, under `system:`, add:
 
@@ -721,7 +721,7 @@ Under `system.loss:`, add:
     lambda_rear_opacity: 0.0
 ```
 
-- [ ] **Step 5: Run tests**
+- [x] **Step 5: Run tests**
 
 Run:
 
