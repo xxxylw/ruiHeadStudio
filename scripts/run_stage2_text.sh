@@ -35,6 +35,11 @@ REFERENCE_METADATA="${REFERENCE_METADATA:-}"
 REFERENCE_LAMBDA_REF_PERSON="${REFERENCE_LAMBDA_REF_PERSON:-0.05}"
 REFERENCE_LAMBDA_REF_FACE="${REFERENCE_LAMBDA_REF_FACE:-0.2}"
 REFERENCE_LAMBDA_REF_TEMPORAL_FACE="${REFERENCE_LAMBDA_REF_TEMPORAL_FACE:-0.02}"
+OPACITY_COVERAGE_ENABLED="${OPACITY_COVERAGE_ENABLED:-false}"
+LAMBDA_OPACITY_COVERAGE="${LAMBDA_OPACITY_COVERAGE:-0.0}"
+REAR_OPACITY_ENABLED="${REAR_OPACITY_ENABLED:-false}"
+LAMBDA_REAR_OPACITY="${LAMBDA_REAR_OPACITY:-0.0}"
+PRUNE_REGION_GUARD_ENABLED="${PRUNE_REGION_GUARD_ENABLED:-false}"
 if [[ "${FORCE_REBUILD_POSE_METADATA:-0}" == "1" || ! -f "$POSE_METADATA_JSON" ]]; then
   mkdir -p "$(dirname "$POSE_METADATA_JSON")"
   run_in_clean_env "$TRAIN_ENV_PREFIX/bin/python" scripts/build_pose_difficulty_metadata.py \
@@ -56,5 +61,10 @@ run_in_clean_env "$TRAIN_ENV_PREFIX/bin/python" launch.py --config configs/heads
   "system.loss.lambda_ref_person=${REFERENCE_LAMBDA_REF_PERSON}" \
   "system.loss.lambda_ref_face=${REFERENCE_LAMBDA_REF_FACE}" \
   "system.loss.lambda_ref_temporal_face=${REFERENCE_LAMBDA_REF_TEMPORAL_FACE}" \
+  "system.opacity_coverage.enabled=${OPACITY_COVERAGE_ENABLED}" \
+  "system.rear_opacity.enabled=${REAR_OPACITY_ENABLED}" \
+  "system.prune_region_guard.enabled=${PRUNE_REGION_GUARD_ENABLED}" \
+  "system.loss.lambda_opacity_coverage=${LAMBDA_OPACITY_COVERAGE}" \
+  "system.loss.lambda_rear_opacity=${LAMBDA_REAR_OPACITY}" \
   "${WEIGHTS_ARG[@]}" \
   "$@"

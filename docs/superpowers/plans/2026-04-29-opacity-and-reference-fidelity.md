@@ -1012,7 +1012,7 @@ Expected:
 OK
 ```
 
-- [ ] **Step 7: Commit Task 6**
+- [x] **Step 7: Commit Task 6**
 
 Run:
 
@@ -1030,7 +1030,7 @@ git commit -m "扩展 reference feature loss 配置表面"
 - Modify: `scripts/run_two_stage.sh`
 - Test: `tests/test_stage_run_scripts.py`
 
-- [ ] **Step 1: Add failing tests for env knobs**
+- [x] **Step 1: Add failing tests for env knobs**
 
 Append to `tests/test_stage_run_scripts.py`:
 
@@ -1045,7 +1045,7 @@ Append to `tests/test_stage_run_scripts.py`:
         self.assertIn("system.loss.lambda_opacity_coverage=${LAMBDA_OPACITY_COVERAGE}", stage2)
 ```
 
-- [ ] **Step 2: Run tests and verify failure**
+- [x] **Step 2: Run tests and verify failure**
 
 Run:
 
@@ -1059,7 +1059,7 @@ Expected:
 FAIL: test_stage2_script_accepts_opacity_repair_overrides
 ```
 
-- [ ] **Step 3: Add env defaults and Hydra overrides to Stage2 script**
+- [x] **Step 3: Add env defaults and Hydra overrides to Stage2 script**
 
 In `scripts/run_stage2_text.sh`, near reference env defaults:
 
@@ -1081,7 +1081,7 @@ In the `launch.py` command add:
   "system.loss.lambda_rear_opacity=${LAMBDA_REAR_OPACITY}" \
 ```
 
-- [ ] **Step 4: Forward env in two-stage script**
+- [x] **Step 4: Forward env in two-stage script**
 
 In `scripts/run_two_stage.sh`, ensure Stage2 invocation preserves:
 
@@ -1093,7 +1093,7 @@ LAMBDA_REAR_OPACITY="${LAMBDA_REAR_OPACITY:-0.0}" \
 PRUNE_REGION_GUARD_ENABLED="${PRUNE_REGION_GUARD_ENABLED:-false}" \
 ```
 
-- [ ] **Step 5: Run tests**
+- [x] **Step 5: Run tests**
 
 Run:
 

@@ -96,6 +96,27 @@ class TestStageRunScripts(unittest.TestCase):
         self.assertIn("trainer.max_steps=1", script)
         self.assertIn("--test", script)
 
+    def test_stage2_script_accepts_opacity_repair_overrides(self):
+        stage2 = Path("scripts/run_stage2_text.sh").read_text(encoding="utf-8")
+
+        self.assertIn("OPACITY_COVERAGE_ENABLED", stage2)
+        self.assertIn("REAR_OPACITY_ENABLED", stage2)
+        self.assertIn("PRUNE_REGION_GUARD_ENABLED", stage2)
+        self.assertIn("system.opacity_coverage.enabled=${OPACITY_COVERAGE_ENABLED}", stage2)
+        self.assertIn(
+            "system.loss.lambda_opacity_coverage=${LAMBDA_OPACITY_COVERAGE}",
+            stage2,
+        )
+
+    def test_two_stage_script_forwards_opacity_repair_overrides(self):
+        two_stage = Path("scripts/run_two_stage.sh").read_text(encoding="utf-8")
+
+        self.assertIn("OPACITY_COVERAGE_ENABLED", two_stage)
+        self.assertIn("LAMBDA_OPACITY_COVERAGE", two_stage)
+        self.assertIn("REAR_OPACITY_ENABLED", two_stage)
+        self.assertIn("LAMBDA_REAR_OPACITY", two_stage)
+        self.assertIn("PRUNE_REGION_GUARD_ENABLED", two_stage)
+
 
 if __name__ == "__main__":
     unittest.main()
