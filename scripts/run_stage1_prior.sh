@@ -30,6 +30,8 @@ run_in_clean_env() {
 }
 
 POSE_METADATA_JSON="${POSE_METADATA_JSON:-./collection/ruiheadstudio/flame_collections/curriculum/train_pose_metadata.json}"
+STAGE1_LAMBDA_SPARSITY="${STAGE1_LAMBDA_SPARSITY:-0.1}"
+STAGE1_LAMBDA_OPAQUE="${STAGE1_LAMBDA_OPAQUE:-0.1}"
 if [[ "${FORCE_REBUILD_POSE_METADATA:-0}" == "1" || ! -f "$POSE_METADATA_JSON" ]]; then
   mkdir -p "$(dirname "$POSE_METADATA_JSON")"
   run_in_clean_env "$TRAIN_ENV_PREFIX/bin/python" scripts/build_pose_difficulty_metadata.py \
@@ -41,4 +43,6 @@ fi
 
 run_in_clean_env "$TRAIN_ENV_PREFIX/bin/python" launch.py --config configs/headstudio_stage1_prior.yaml --train \
   "data.pose_metadata_inputs=['${POSE_METADATA_JSON}']" \
+  "system.loss.lambda_sparsity=${STAGE1_LAMBDA_SPARSITY}" \
+  "system.loss.lambda_opaque=${STAGE1_LAMBDA_OPAQUE}" \
   "$@"

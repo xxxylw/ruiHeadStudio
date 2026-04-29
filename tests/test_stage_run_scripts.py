@@ -117,6 +117,50 @@ class TestStageRunScripts(unittest.TestCase):
         self.assertIn("LAMBDA_REAR_OPACITY", two_stage)
         self.assertIn("PRUNE_REGION_GUARD_ENABLED", two_stage)
 
+    def test_two_stage_script_supports_identity_aware_stage1_prompt(self):
+        two_stage = Path("scripts/run_two_stage.sh").read_text(encoding="utf-8")
+
+        self.assertIn("IDENTITY_AWARE_STAGE1_ENABLED", two_stage)
+        self.assertIn('IDENTITY_AWARE_STAGE1_ENABLED="${IDENTITY_AWARE_STAGE1_ENABLED:-true}"', two_stage)
+        self.assertIn('STAGE1_PROMPT="${STAGE1_PROMPT:-$STAGE2_PROMPT}"', two_stage)
+        self.assertIn("system.prompt_processor.prompt=${STAGE1_PROMPT}", two_stage)
+
+    def test_stage_run_scripts_accept_sparsity_and_opaque_overrides(self):
+        stage1 = Path("scripts/run_stage1_prior.sh").read_text(encoding="utf-8")
+        stage2 = Path("scripts/run_stage2_text.sh").read_text(encoding="utf-8")
+        two_stage = Path("scripts/run_two_stage.sh").read_text(encoding="utf-8")
+
+        self.assertIn("STAGE1_LAMBDA_SPARSITY", two_stage)
+        self.assertIn("STAGE1_LAMBDA_OPAQUE", two_stage)
+        self.assertIn("STAGE2_LAMBDA_SPARSITY", two_stage)
+        self.assertIn("STAGE2_LAMBDA_OPAQUE", two_stage)
+        self.assertIn("system.loss.lambda_sparsity=${STAGE1_LAMBDA_SPARSITY}", stage1)
+        self.assertIn("system.loss.lambda_opaque=${STAGE1_LAMBDA_OPAQUE}", stage1)
+        self.assertIn("system.loss.lambda_sparsity=${STAGE2_LAMBDA_SPARSITY}", stage2)
+        self.assertIn("system.loss.lambda_opaque=${STAGE2_LAMBDA_OPAQUE}", stage2)
+
+    def test_two_stage_reference_defaults_keep_face_and_temporal_not_person(self):
+        two_stage = Path("scripts/run_two_stage.sh").read_text(encoding="utf-8")
+
+        self.assertIn('REFERENCE_LAMBDA_REF_PERSON="${REFERENCE_LAMBDA_REF_PERSON:-0.0}"', two_stage)
+        self.assertIn('REFERENCE_LAMBDA_REF_FACE="${REFERENCE_LAMBDA_REF_FACE:-0.2}"', two_stage)
+        self.assertIn(
+            'REFERENCE_LAMBDA_REF_TEMPORAL_FACE="${REFERENCE_LAMBDA_REF_TEMPORAL_FACE:-0.02}"',
+            two_stage,
+        )
+
+    def test_stage_configs_use_identity_refinement_loss_defaults(self):
+        stage1 = Path("configs/headstudio_stage1_prior.yaml").read_text(encoding="utf-8")
+        stage2 = Path("configs/headstudio_stage2_text.yaml").read_text(encoding="utf-8")
+
+        self.assertIn("lambda_sparsity: 0.1", stage1)
+        self.assertIn("lambda_opaque: 0.1", stage1)
+        self.assertIn("lambda_sparsity: 0.05", stage2)
+        self.assertIn("lambda_opaque: 0.2", stage2)
+        self.assertIn("lambda_ref_person: 0.0", stage2)
+        self.assertIn("lambda_ref_face: 0.2", stage2)
+        self.assertIn("lambda_ref_temporal_face: 0.02", stage2)
+
 
 if __name__ == "__main__":
     unittest.main()

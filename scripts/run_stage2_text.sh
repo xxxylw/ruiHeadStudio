@@ -32,9 +32,11 @@ run_in_clean_env() {
 POSE_METADATA_JSON="${POSE_METADATA_JSON:-./collection/ruiheadstudio/flame_collections/curriculum/train_pose_metadata.json}"
 REFERENCE_FIDELITY_ENABLED="${REFERENCE_FIDELITY_ENABLED:-false}"
 REFERENCE_METADATA="${REFERENCE_METADATA:-}"
-REFERENCE_LAMBDA_REF_PERSON="${REFERENCE_LAMBDA_REF_PERSON:-0.05}"
+REFERENCE_LAMBDA_REF_PERSON="${REFERENCE_LAMBDA_REF_PERSON:-0.0}"
 REFERENCE_LAMBDA_REF_FACE="${REFERENCE_LAMBDA_REF_FACE:-0.2}"
 REFERENCE_LAMBDA_REF_TEMPORAL_FACE="${REFERENCE_LAMBDA_REF_TEMPORAL_FACE:-0.02}"
+STAGE2_LAMBDA_SPARSITY="${STAGE2_LAMBDA_SPARSITY:-0.05}"
+STAGE2_LAMBDA_OPAQUE="${STAGE2_LAMBDA_OPAQUE:-0.2}"
 OPACITY_COVERAGE_ENABLED="${OPACITY_COVERAGE_ENABLED:-false}"
 LAMBDA_OPACITY_COVERAGE="${LAMBDA_OPACITY_COVERAGE:-0.0}"
 REAR_OPACITY_ENABLED="${REAR_OPACITY_ENABLED:-false}"
@@ -61,6 +63,8 @@ run_in_clean_env "$TRAIN_ENV_PREFIX/bin/python" launch.py --config configs/heads
   "system.loss.lambda_ref_person=${REFERENCE_LAMBDA_REF_PERSON}" \
   "system.loss.lambda_ref_face=${REFERENCE_LAMBDA_REF_FACE}" \
   "system.loss.lambda_ref_temporal_face=${REFERENCE_LAMBDA_REF_TEMPORAL_FACE}" \
+  "system.loss.lambda_sparsity=${STAGE2_LAMBDA_SPARSITY}" \
+  "system.loss.lambda_opaque=${STAGE2_LAMBDA_OPAQUE}" \
   "system.opacity_coverage.enabled=${OPACITY_COVERAGE_ENABLED}" \
   "system.rear_opacity.enabled=${REAR_OPACITY_ENABLED}" \
   "system.prune_region_guard.enabled=${PRUNE_REGION_GUARD_ENABLED}" \
