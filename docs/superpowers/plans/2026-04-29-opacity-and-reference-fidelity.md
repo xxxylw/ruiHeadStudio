@@ -45,7 +45,7 @@
 - Create: `threestudio/utils/opacity_diagnostics.py`
 - Test: `tests/test_opacity_diagnostics.py`
 
-- [ ] **Step 1: Write failing tests for quantiles, region labels, and summaries**
+- [x] **Step 1: Write failing tests for quantiles, region labels, and summaries**
 
 Create `tests/test_opacity_diagnostics.py`:
 
@@ -118,7 +118,7 @@ if __name__ == "__main__":
     unittest.main()
 ```
 
-- [ ] **Step 2: Run tests and verify failure**
+- [x] **Step 2: Run tests and verify failure**
 
 Run:
 
@@ -132,7 +132,7 @@ Expected:
 ModuleNotFoundError: No module named 'threestudio.utils.opacity_diagnostics'
 ```
 
-- [ ] **Step 3: Implement diagnostics utility**
+- [x] **Step 3: Implement diagnostics utility**
 
 Create `threestudio/utils/opacity_diagnostics.py`:
 
@@ -234,7 +234,7 @@ def summarize_gaussian_regions(
     }
 ```
 
-- [ ] **Step 4: Run tests and verify pass**
+- [x] **Step 4: Run tests and verify pass**
 
 Run:
 
