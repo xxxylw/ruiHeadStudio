@@ -26,6 +26,7 @@ from gaussiansplatting.utils.flame_anchor import apply_face_transform
 from gaussiansplatting.scene.gaussian_model import GaussianModel
 from gaussiansplatting.utils.general_utils import strip_symmetric, build_scaling_rotation_only
 from gaussiansplatting.utils.general_utils import inverse_sigmoid, get_expon_lr_func, build_rotation
+from threestudio.utils.opacity_diagnostics import classify_by_face_normals
 
 
 class GaussianFlameModel(GaussianModel):
@@ -202,6 +203,41 @@ class GaussianFlameModel(GaussianModel):
     def get_anchor_world_xyz(self):
         T, R, S = self.get_face_transform_components()
         return apply_face_transform(self._xyz_anchor, T, R, S)
+
+    def get_bound_face_normals(self):
+        _, R, _ = self.get_face_transform_components()
+        if R.numel() == 0:
+            return torch.empty((0, 3), dtype=torch.float32, device=self.device)
+        return F.normalize(R[:, :, 2], dim=-1)
+
+    def get_gaussian_region_labels(self, front_threshold=0.35, rear_threshold=-0.35):
+        return classify_by_face_normals(
+            self.get_bound_face_normals(),
+            front_threshold=front_threshold,
+            rear_threshold=rear_threshold,
+        )
+
+    def _region_opacity_prune_mask(self, opacity_prune_mask, region_min_opacity=None):
+        if not region_min_opacity:
+            return opacity_prune_mask
+
+        prune_mask = opacity_prune_mask.clone()
+        opacity = self.get_opacity.detach().reshape(-1)
+        labels = self.get_gaussian_region_labels()
+        if opacity.numel() != len(labels) or prune_mask.numel() != len(labels):
+            raise ValueError("opacity prune mask and Gaussian region labels must have the same length")
+
+        for region, min_opacity in region_min_opacity.items():
+            region_mask = torch.tensor(
+                [label == region for label in labels],
+                dtype=torch.bool,
+                device=prune_mask.device,
+            )
+            if not region_mask.any():
+                continue
+            region_opacity_mask = opacity < float(min_opacity)
+            prune_mask = torch.where(region_mask, region_opacity_mask, prune_mask)
+        return prune_mask
 
     def extract_tris(self, betas, expression, global_orient=None, jaw_pose=None, leye_pose=None, reye_pose=None,
                      center=None, scale=None):
@@ -611,14 +647,15 @@ class GaussianFlameModel(GaussianModel):
         self.densification_postfix(new_xyz, new_features_dc, new_features_rest, new_opacities, new_scaling,
                                    new_rotation, new_faces, new_max_radii2D)
 
-    def densify_and_prune(self, max_grad, min_opacity, extent, max_screen_size):
+    def densify_and_prune(self, max_grad, min_opacity, extent, max_screen_size, region_min_opacity=None):
         grads = self.xyz_gradient_accum / self.denom
         grads[grads.isnan()] = 0.0
 
         self.densify_and_clone(grads, max_grad, extent)
         self.densify_and_split(grads, max_grad, extent)
 
-        prune_mask = (self.get_opacity < min_opacity).squeeze()
+        opacity_prune_mask = (self.get_opacity < min_opacity).squeeze()
+        prune_mask = self._region_opacity_prune_mask(opacity_prune_mask, region_min_opacity)
         if max_screen_size:
             big_points_vs = self.max_radii2D > max_screen_size
             big_points_ws = self.get_scaling.max(dim=1).values > 0.03 * extent  # 0.05
@@ -630,8 +667,11 @@ class GaussianFlameModel(GaussianModel):
 
         torch.cuda.empty_cache()
 
-    def prune_only(self, min_opacity=0.005, extent=0.01):
-        unseen_points = (self.get_opacity < min_opacity).squeeze()
+    def prune_only(self, min_opacity=0.005, extent=0.01, region_min_opacity=None):
+        unseen_points = self._region_opacity_prune_mask(
+            (self.get_opacity < min_opacity).squeeze(),
+            region_min_opacity,
+        )
         big_points_ws = self.get_scaling.max(dim=1).values > 0.03 * extent
         prune_mask = torch.logical_or(unseen_points, big_points_ws)
         self.prune_points(prune_mask)

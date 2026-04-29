@@ -249,7 +249,7 @@ Ran 4 tests
 OK
 ```
 
-- [ ] **Step 5: Commit Task 1**
+- [x] **Step 5: Commit Task 1**
 
 Run:
 
@@ -266,7 +266,7 @@ git commit -m "添加 opacity 诊断统计工具"
 - Modify: `gaussiansplatting/scene/gaussian_flame_model.py`
 - Test: `tests/test_region_prune_guard.py`
 
-- [ ] **Step 1: Write failing source tests for region helpers**
+- [x] **Step 1: Write failing source tests for region helpers**
 
 Create `tests/test_region_prune_guard.py`:
 
@@ -299,7 +299,7 @@ if __name__ == "__main__":
     unittest.main()
 ```
 
-- [ ] **Step 2: Run tests and verify failure**
+- [x] **Step 2: Run tests and verify failure**
 
 Run:
 
@@ -313,7 +313,7 @@ Expected:
 FAIL: test_gaussian_flame_model_exposes_region_helpers
 ```
 
-- [ ] **Step 3: Implement region helpers and optional threshold mask**
+- [x] **Step 3: Implement region helpers and optional threshold mask**
 
 Modify `gaussiansplatting/scene/gaussian_flame_model.py`.
 
@@ -394,7 +394,7 @@ with:
             unseen_points = (self.get_opacity < min_opacity).squeeze()
 ```
 
-- [ ] **Step 4: Run tests**
+- [x] **Step 4: Run tests**
 
 Run:
 
