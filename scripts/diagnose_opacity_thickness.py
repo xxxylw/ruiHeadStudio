@@ -123,6 +123,7 @@ def build_parser() -> argparse.ArgumentParser:
 def main() -> None:
     args = build_parser().parse_args()
     run_diagnostics(args.ply, args.output)
+    print(f"Wrote {args.output / 'gaussian_region_stats.json'}")
 
 
 if __name__ == "__main__":

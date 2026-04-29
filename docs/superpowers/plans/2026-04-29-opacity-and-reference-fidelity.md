@@ -1107,7 +1107,7 @@ Expected:
 OK
 ```
 
-- [ ] **Step 6: Commit Task 7**
+- [x] **Step 6: Commit Task 7**
 
 Run:
 
@@ -1124,7 +1124,7 @@ git commit -m "暴露 opacity 修复实验开关"
 - Modify: `docs/2026-04-29-group-meeting-progress-report.md` if desired
 - Create or modify: `docs/2026-04-29-opacity-reference-implementation-status.md`
 
-- [ ] **Step 1: Run full relevant unit tests**
+- [x] **Step 1: Run full relevant unit tests**
 
 Run:
 
@@ -1145,7 +1145,7 @@ Expected:
 OK
 ```
 
-- [ ] **Step 2: Run compile checks**
+- [x] **Step 2: Run compile checks**
 
 Run:
 
@@ -1165,7 +1165,7 @@ No traceback
 
 The existing `SyntaxWarning` for `(\d+)\.png` may still appear until that unrelated string is cleaned up.
 
-- [ ] **Step 3: Run diagnostics on existing output**
+- [x] **Step 3: Run diagnostics on existing output**
 
 Run:
 
@@ -1181,7 +1181,7 @@ Expected:
 Wrote outputs/cristiano_ronaldo_ref_v120260428-161859/headstudio-stage2-text/diagnostics/opacity_thickness/gaussian_region_stats.json
 ```
 
-- [ ] **Step 4: Write implementation status doc**
+- [x] **Step 4: Write implementation status doc**
 
 Create `docs/2026-04-29-opacity-reference-implementation-status.md`:
 
@@ -1216,7 +1216,7 @@ bash scripts/run_stage2_text.sh ...
 ```
 ```
 
-- [ ] **Step 5: Commit Task 8**
+- [x] **Step 5: Commit Task 8**
 
 Run:
 
