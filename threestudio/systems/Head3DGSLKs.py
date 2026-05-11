@@ -31,6 +31,8 @@ class Head3DGSLKsRig(BaseLift3DSystem):
         flame_path: str = "/path/to/flame/model"
         flame_gender: str = 'generic'
         pts_num: int = 100000
+        gaussian_init_ply: Optional[str] = None
+        gaussian_init_step: int = 0
 
         disable_hand_densification: bool = False
         hand_radius: float = 0.05
@@ -57,6 +59,10 @@ class Head3DGSLKsRig(BaseLift3DSystem):
         # area_scaling_factor: float = 1
 
     cfg: Config
+
+    @property
+    def true_global_step(self):
+        return super().true_global_step + self.cfg.gaussian_init_step
 
     def configure(self) -> None:
         self.radius = self.cfg.radius
@@ -467,6 +473,9 @@ class Head3DGSLKsRig(BaseLift3DSystem):
         opt = OptimizationParams(self.parser)
 
         self.gaussian.create_from_flame(self.cameras_extent, -10, N=self.cfg.pts_num)
+        if self.cfg.gaussian_init_ply is not None:
+            threestudio.info(f"Initializing Gaussian state from PLY: {self.cfg.gaussian_init_ply}")
+            self.gaussian.load_ply(self.cfg.gaussian_init_ply)
         self.gaussian.training_setup(opt)
 
         ret = {
