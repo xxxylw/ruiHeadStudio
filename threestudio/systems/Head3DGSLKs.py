@@ -54,6 +54,8 @@ class Head3DGSLKsRig(BaseLift3DSystem):
         area_relax: bool = False
         shape_update_end_step: int = 12000
         training_w_animation: bool = True
+        use_eye_pose: bool = False
+        use_neck_pose: bool = False
 
         # area scaling factor
         # area_scaling_factor: float = 1
@@ -130,9 +132,10 @@ class Head3DGSLKsRig(BaseLift3DSystem):
     def set_pose(self, expression, jaw_pose, leye_pose, reye_pose, neck_pose=None):
         self.gaussian._expression = expression.detach()
         self.gaussian._jaw_pose = jaw_pose.detach()
-        # self.gaussian._leye_pose = leye_pose.detach()
-        # self.gaussian._reye_pose = reye_pose.detach()
-        if neck_pose is not None:
+        if self.cfg.use_eye_pose:
+            self.gaussian._leye_pose = leye_pose.detach()
+            self.gaussian._reye_pose = reye_pose.detach()
+        if self.cfg.use_neck_pose and neck_pose is not None:
             self.gaussian._neck_pose = neck_pose.detach()
 
     def forward(self, batch: Dict[str, Any], renderbackground=None) -> Dict[str, Any]:
@@ -145,7 +148,13 @@ class Head3DGSLKsRig(BaseLift3DSystem):
         self.viewspace_point_list = []
 
         if self.cfg.training_w_animation:
-            self.set_pose(batch['expression'], batch['jaw_pose'], batch['leye_pose'], batch['reye_pose'])
+            self.set_pose(
+                batch['expression'],
+                batch['jaw_pose'],
+                batch['leye_pose'],
+                batch['reye_pose'],
+                batch.get('neck_pose', None),
+            )
 
         for id in range(batch['c2w'].shape[0]):
             viewpoint_cam = Camera(c2w=batch['c2w'][id], FoVy=batch['fovy'][id], height=batch['height'],

@@ -65,6 +65,8 @@ system:
   bg_white: False
   area_relax: False
   training_w_animation: ${data.training_w_animation}
+  use_eye_pose: False
+  use_neck_pose: False
 
   guidance_type: "controlnet-depth-guidance"
   guidance:
