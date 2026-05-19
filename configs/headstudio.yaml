@@ -68,6 +68,7 @@ system:
   prune_size_threshold: 0.002
   half_scheduler_max_step: 3000
   size_threshold_fix_step: 1500
+  surface_constraint_start_step: 2400
   apose: true
   bg_white: False
   area_relax: False
@@ -104,6 +105,8 @@ system:
     lambda_opaque: 0.0
     lambda_position: 10.0
     lambda_scaling: 10.0
+    lambda_barycentric_inside: 0.0
+    lambda_normal_offset: 0.0
     lambda_shape: 0.0
   optimizer:
     name: Adam

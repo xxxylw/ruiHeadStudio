@@ -106,36 +106,7 @@ class GaussianFlameModel(GaussianModel):
 
     @property
     def get_tris_scaling(self):
-        flame_model = self.model
-        # flame: shape and expression
-        betas = self.get_shape
-        expression = self.get_expression
-        faces = self.get_faces
-        jaw_pose = self.get_jaw_pose
-        leye_pose = self.get_leye_pose
-        reye_pose = self.get_reye_pose
-        # global_orient = self.get_global_orient
-        neck_pose = self.get_neck_pose
-
-        # flame: triangles
-        flame_output = flame_model(
-            betas=betas,
-            neck_pose=neck_pose,
-            expression=expression,
-            jaw_pose=jaw_pose,
-            leye_pose=leye_pose,
-            reye_pose=reye_pose,
-            return_verts=True
-        )
-        vertices = flame_output.vertices.squeeze()
-        # rescale and recenter
-
-        vertices = (vertices - self.center) * self.scale
-        # coordinate system: opengl --> blender (switch y/z)
-        vertices[:, [1, 2]] = vertices[:, [2, 1]]
-        vertices *= 1.1 ** (-self.flame_scale)
-
-        tris = vertices[faces]
+        tris = self.get_bound_triangles()
         T = self.centroid(tris)
         a, b, c = tris[:, 0], tris[:, 1], tris[:, 2]
         _a = torch.norm(a - T, dim=-1)
@@ -143,7 +114,7 @@ class GaussianFlameModel(GaussianModel):
         _c = torch.norm(c - T, dim=-1)
         return torch.stack([_a, _b, _c], dim=1)
 
-    def get_trans_matrix(self):
+    def get_bound_triangles(self):
         flame_model = self.model
         # flame: shape and expression
         betas = self.get_shape
@@ -174,12 +145,42 @@ class GaussianFlameModel(GaussianModel):
         vertices *= 1.1 ** (-self.flame_scale)
 
         tris = vertices[faces]
+        return tris
+
+    def get_trans_matrix(self):
+        tris = self.get_bound_triangles()
         # tris = torch.tensor(tris, dtype=torch.float32, device=self.device)
 
         T = self.centroid(tris)
         R = self.tbn(tris)
         S = self.area(tris)
         return T, R, S
+
+    def get_surface_constraint_terms(self):
+        tris = self.get_bound_triangles()
+        points = self.get_xyz
+
+        a, b, c = tris[:, 0], tris[:, 1], tris[:, 2]
+        v0 = b - a
+        v1 = c - a
+        normal = F.normalize(torch.cross(v0, v1), dim=-1)
+
+        signed_offset = torch.sum((points - a) * normal, dim=-1)
+        projected = points - signed_offset.unsqueeze(-1) * normal
+        normal_offset = torch.sum((points - projected) * normal, dim=-1)
+
+        v2 = projected - a
+        d00 = torch.sum(v0 * v0, dim=-1)
+        d01 = torch.sum(v0 * v1, dim=-1)
+        d11 = torch.sum(v1 * v1, dim=-1)
+        d20 = torch.sum(v2 * v0, dim=-1)
+        d21 = torch.sum(v2 * v1, dim=-1)
+        denom = d00 * d11 - d01 * d01 + 1e-10
+        v = (d11 * d20 - d01 * d21) / denom
+        w = (d00 * d21 - d01 * d20) / denom
+        u = 1.0 - v - w
+        barycentric = torch.stack([u, v, w], dim=1)
+        return barycentric, normal_offset
 
     @property
     def get_scaling(self):

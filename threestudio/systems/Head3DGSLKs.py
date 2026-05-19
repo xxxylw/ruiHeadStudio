@@ -53,6 +53,7 @@ class Head3DGSLKsRig(BaseLift3DSystem):
 
         area_relax: bool = False
         shape_update_end_step: int = 12000
+        surface_constraint_start_step: int = 2400
         training_w_animation: bool = True
         use_eye_pose: bool = False
         use_neck_pose: bool = False
@@ -85,6 +86,8 @@ class Head3DGSLKsRig(BaseLift3DSystem):
 
         self.cfg.loss.lambda_position = 0.01 * self.cfg.loss.lambda_position
         self.cfg.loss.lambda_scaling = 0.01 * self.cfg.loss.lambda_scaling
+        self.cfg.loss.lambda_barycentric_inside = 0.01 * self.cfg.loss.lambda_barycentric_inside
+        self.cfg.loss.lambda_normal_offset = 0.01 * self.cfg.loss.lambda_normal_offset
         if self.cfg.area_relax:
             reduction = 'none'
         else:
@@ -259,6 +262,18 @@ class Head3DGSLKsRig(BaseLift3DSystem):
                 loss_position = (loss_position / (S[mask] + 1e-10)).mean()
             self.log("train/loss_position", loss_position)
             loss += loss_position * self.C(self.cfg.loss.lambda_position)
+
+        lambda_barycentric_inside = self.C(self.cfg.loss.lambda_barycentric_inside)
+        lambda_normal_offset = self.C(self.cfg.loss.lambda_normal_offset)
+        if self.true_global_step >= self.cfg.surface_constraint_start_step and (
+                lambda_barycentric_inside > 0.0 or lambda_normal_offset > 0.0):
+            barycentric, normal_offset = self.gaussian.get_surface_constraint_terms()
+            loss_barycentric_inside = F.relu(-barycentric).mean()
+            loss_normal_offset = torch.abs(normal_offset).mean()
+            self.log("train/loss_barycentric_inside", loss_barycentric_inside)
+            self.log("train/loss_normal_offset", loss_normal_offset)
+            loss += loss_barycentric_inside * lambda_barycentric_inside
+            loss += loss_normal_offset * lambda_normal_offset
 
         loss_shape = torch.norm(self.gaussian._shape)
         self.log("train/loss_shape", loss_shape)
