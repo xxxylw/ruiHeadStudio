@@ -28,6 +28,52 @@ import pickle
 
 
 @dataclass
+class PoseSource:
+    name: str
+    weight: float
+    sequences: List[Dict[str, np.ndarray]]
+
+
+def _collection_to_sequences(path: str) -> List[Dict[str, np.ndarray]]:
+    collection = np.load(path, allow_pickle=True)
+    return list(collection.tolist())
+
+
+def load_pose_sources(source_configs, fallback_path: str) -> List[PoseSource]:
+    if source_configs is None:
+        source_configs = []
+
+    if len(source_configs) == 0:
+        source_configs = [{"path": fallback_path, "weight": 1.0, "name": "talkshow"}]
+
+    sources: List[PoseSource] = []
+    for index, item in enumerate(source_configs):
+        if isinstance(item, str):
+            path = item
+            weight = 1.0
+            name = os.path.splitext(os.path.basename(path))[0] or f"source_{index}"
+        else:
+            path = item["path"]
+            weight = float(item.get("weight", 1.0))
+            name = str(item.get("name", os.path.splitext(os.path.basename(path))[0] or f"source_{index}"))
+        if weight <= 0:
+            raise ValueError(f"Pose source weight must be positive for {name}: {weight}")
+
+        sequences = _collection_to_sequences(path)
+        if len(sequences) == 0:
+            raise ValueError(f"Pose source has no sequences: {path}")
+        sources.append(PoseSource(name=name, weight=weight, sequences=sequences))
+
+    return sources
+
+
+def sample_pose_sequence(sources: List[PoseSource], rng=random):
+    source = rng.choices(sources, weights=[item.weight for item in sources], k=1)[0]
+    sequence = source.sequences[rng.randint(0, len(source.sequences) - 1)]
+    return source.name, sequence
+
+
+@dataclass
 class RandomCameraDataModuleConfig:
     # height, width, and batch_size should be Union[int, List[int]]
     # but OmegaConf does not support Union of containers
@@ -82,6 +128,7 @@ class RandomCameraDataModuleConfig:
 
     num_workers: int = 0
     talkshow_train_path: str = "path/to/talkshow_train"
+    talkshow_train_paths: List[Any] = field(default_factory=list)
     talkshow_val_path: str = "path/to/talkshow_val"
 
     is_lmk: bool = True
@@ -147,7 +194,8 @@ class RandomCameraIterableDataset(IterableDataset, Updateable):
             flame_scale=-10
         )
 
-        self.pose_train_list = np.load(self.cfg.talkshow_train_path, allow_pickle=True)
+        self.pose_sources = load_pose_sources(self.cfg.talkshow_train_paths, self.cfg.talkshow_train_path)
+        self.pose_train_list = self.pose_sources[0].sequences
 
     def update_step(self, epoch: int, global_step: int, on_load_weights: bool = False):
         size_ind = bisect.bisect_right(self.resolution_milestones, global_step) - 1
@@ -405,8 +453,7 @@ class RandomCameraIterableDataset(IterableDataset, Updateable):
                                    ].repeat(self.batch_size, 1)
 
         if self.cfg.training_w_animation:
-            idx = random.randint(0, len(self.pose_train_list) - 1)
-            pose = self.pose_train_list[idx]
+            _, pose = sample_pose_sequence(self.pose_sources)
             idx2 = random.randint(0, pose['expression'].shape[0] - 1)
             expression = torch.from_numpy(pose['expression'][idx2: idx2 + 1]).to('cuda')
             jaw_pose = torch.from_numpy(pose['jaw_pose'][idx2: idx2 + 1]).to('cuda')
