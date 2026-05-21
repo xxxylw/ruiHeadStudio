@@ -109,13 +109,13 @@ def load_module():
     return module
 
 
-def make_sequence(value: float):
+def make_sequence(value: float, frames: int = 1):
     return {
-        "expression": np.full((1, 100), value, dtype=np.float32),
-        "jaw_pose": np.full((1, 3), value, dtype=np.float32),
-        "leye_pose": np.full((1, 3), value, dtype=np.float32),
-        "reye_pose": np.full((1, 3), value, dtype=np.float32),
-        "neck_pose": np.full((1, 3), value, dtype=np.float32),
+        "expression": np.arange(value, value + frames, dtype=np.float32)[:, None].repeat(100, axis=1),
+        "jaw_pose": np.arange(value, value + frames, dtype=np.float32)[:, None].repeat(3, axis=1),
+        "leye_pose": np.arange(value, value + frames, dtype=np.float32)[:, None].repeat(3, axis=1),
+        "reye_pose": np.arange(value, value + frames, dtype=np.float32)[:, None].repeat(3, axis=1),
+        "neck_pose": np.arange(value, value + frames, dtype=np.float32)[:, None].repeat(3, axis=1),
     }
 
 
@@ -153,9 +153,63 @@ def test_weighted_pose_source_sampling_happens_before_sequence_sampling():
     assert 700 <= talkvid_count <= 800
 
 
+def test_temporal_window_sampling_uses_per_source_sequential_cursors():
+    module = load_module()
+    sources = [
+        module.PoseSource("talkshow", 1.0, [make_sequence(10.0, frames=3), make_sequence(20.0, frames=2)]),
+        module.PoseSource("talkvid", 1.0, [make_sequence(100.0, frames=3)]),
+    ]
+    cursors = module.create_pose_source_cursors(sources)
+
+    first = module.sample_pose_window_from_source(
+        sources,
+        cursors,
+        source_index=0,
+        window_length=2,
+        window_stride=1,
+    )
+    second = module.sample_pose_window_from_source(
+        sources,
+        cursors,
+        source_index=0,
+        window_length=2,
+        window_stride=1,
+    )
+    talkvid = module.sample_pose_window_from_source(
+        sources,
+        cursors,
+        source_index=1,
+        window_length=2,
+        window_stride=1,
+    )
+    third = module.sample_pose_window_from_source(
+        sources,
+        cursors,
+        source_index=0,
+        window_length=2,
+        window_stride=1,
+    )
+
+    assert first["source_name"] == "talkshow"
+    assert first["sequence_index"] == 0
+    assert first["frame_indices"] == [0, 1]
+    assert first["sequence"]["expression"][:, 0].tolist() == [10.0, 11.0, 12.0]
+
+    assert second["sequence_index"] == 0
+    assert second["frame_indices"] == [1, 2]
+
+    assert talkvid["source_name"] == "talkvid"
+    assert talkvid["sequence_index"] == 0
+    assert talkvid["frame_indices"] == [0, 1]
+
+    assert third["sequence_index"] == 1
+    assert third["frame_indices"] == [0, 1]
+
+
 if __name__ == "__main__":
     import tempfile
 
     with tempfile.TemporaryDirectory() as tmpdir:
         test_multi_source_pose_collection_loads_paths_and_weights(Path(tmpdir))
     test_weighted_pose_source_sampling_happens_before_sequence_sampling()
+    test_temporal_window_sampling_uses_per_source_sequential_cursors()

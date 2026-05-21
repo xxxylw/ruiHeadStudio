@@ -73,6 +73,75 @@ def sample_pose_sequence(sources: List[PoseSource], rng=random):
     return source.name, sequence
 
 
+def create_pose_source_cursors(sources: List[PoseSource]) -> List[Dict[str, int]]:
+    return [{"sequence_index": 0, "frame_index": 0} for _ in sources]
+
+
+def _sequence_frame_count(sequence: Dict[str, np.ndarray]) -> int:
+    return int(sequence["expression"].shape[0])
+
+
+def sample_pose_window_from_source(
+    sources: List[PoseSource],
+    cursors: List[Dict[str, int]],
+    source_index: int,
+    window_length: int,
+    window_stride: int = 1,
+):
+    if window_length <= 0:
+        raise ValueError(f"window_length must be positive: {window_length}")
+    if window_stride <= 0:
+        raise ValueError(f"window_stride must be positive: {window_stride}")
+
+    source = sources[source_index]
+    cursor = cursors[source_index]
+    num_sequences = len(source.sequences)
+
+    for _ in range(num_sequences):
+        sequence_index = cursor["sequence_index"]
+        sequence = source.sequences[sequence_index]
+        frame_count = _sequence_frame_count(sequence)
+
+        if frame_count >= window_length:
+            max_start = frame_count - window_length
+            if cursor["frame_index"] <= max_start:
+                start = cursor["frame_index"]
+                frame_indices = list(range(start, start + window_length))
+                cursor["frame_index"] += window_stride
+                return {
+                    "source_name": source.name,
+                    "source_index": source_index,
+                    "sequence_index": sequence_index,
+                    "frame_indices": frame_indices,
+                    "sequence": sequence,
+                }
+
+        cursor["sequence_index"] = (sequence_index + 1) % num_sequences
+        cursor["frame_index"] = 0
+
+    raise ValueError(
+        f"Pose source {source.name} has no sequence with at least {window_length} frames"
+    )
+
+
+def sample_pose_window(
+    sources: List[PoseSource],
+    cursors: List[Dict[str, int]],
+    window_length: int,
+    window_stride: int = 1,
+    rng=random,
+):
+    source_indices = list(range(len(sources)))
+    source_index = rng.choices(source_indices, weights=[item.weight for item in sources], k=1)[0]
+    return sample_pose_window_from_source(
+        sources,
+        cursors,
+        source_index=source_index,
+        window_length=window_length,
+        window_stride=window_stride,
+    )
+
+
 @dataclass
 class RandomCameraDataModuleConfig:
     # height, width, and batch_size should be Union[int, List[int]]
@@ -137,6 +206,11 @@ class RandomCameraDataModuleConfig:
     control_type: str = "mediapipe"
 
     training_w_animation: bool = True
+    temporal_window_enabled: bool = False
+    temporal_window_length: int = 2
+    temporal_window_stride: int = 1
+    temporal_primary_index: int = 0
+    temporal_same_camera: bool = True
 
 
 class RandomCameraIterableDataset(IterableDataset, Updateable):
@@ -196,6 +270,7 @@ class RandomCameraIterableDataset(IterableDataset, Updateable):
 
         self.pose_sources = load_pose_sources(self.cfg.talkshow_train_paths, self.cfg.talkshow_train_path)
         self.pose_train_list = self.pose_sources[0].sequences
+        self.pose_source_cursors = create_pose_source_cursors(self.pose_sources)
 
     def update_step(self, epoch: int, global_step: int, on_load_weights: bool = False):
         size_ind = bisect.bisect_right(self.resolution_milestones, global_step) - 1
@@ -452,14 +527,61 @@ class RandomCameraIterableDataset(IterableDataset, Updateable):
                                    None, :
                                    ].repeat(self.batch_size, 1)
 
+        temporal_enabled = False
+        temporal_source_name = None
+        temporal_source_index = None
+        temporal_sequence_index = None
+        temporal_frame_indices = None
+        temporal_primary_index = None
+        temporal_window_length = None
+        temporal_expression = None
+        temporal_jaw_pose = None
+        temporal_leye_pose = None
+        temporal_reye_pose = None
+        temporal_neck_pose = None
+
         if self.cfg.training_w_animation:
-            _, pose = sample_pose_sequence(self.pose_sources)
-            idx2 = random.randint(0, pose['expression'].shape[0] - 1)
-            expression = torch.from_numpy(pose['expression'][idx2: idx2 + 1]).to('cuda')
-            jaw_pose = torch.from_numpy(pose['jaw_pose'][idx2: idx2 + 1]).to('cuda')
-            leye_pose = torch.from_numpy(pose['leye_pose'][idx2: idx2 + 1]).to('cuda')
-            reye_pose = torch.from_numpy(pose['reye_pose'][idx2: idx2 + 1]).to('cuda')
-            neck_pose = torch.from_numpy(pose['neck_pose'][idx2: idx2 + 1]).to('cuda')
+            if self.cfg.temporal_window_enabled:
+                temporal_enabled = True
+                temporal_window_length = self.cfg.temporal_window_length
+                temporal_primary_index = self.cfg.temporal_primary_index
+                if not 0 <= temporal_primary_index < temporal_window_length:
+                    raise ValueError(
+                        "temporal_primary_index must be in [0, temporal_window_length)"
+                    )
+
+                window = sample_pose_window(
+                    self.pose_sources,
+                    self.pose_source_cursors,
+                    window_length=temporal_window_length,
+                    window_stride=self.cfg.temporal_window_stride,
+                )
+                pose = window["sequence"]
+                temporal_source_name = window["source_name"]
+                temporal_source_index = window["source_index"]
+                temporal_sequence_index = window["sequence_index"]
+                temporal_frame_indices = window["frame_indices"]
+
+                temporal_expression = torch.from_numpy(pose['expression'][temporal_frame_indices]).to('cuda')
+                temporal_jaw_pose = torch.from_numpy(pose['jaw_pose'][temporal_frame_indices]).to('cuda')
+                temporal_leye_pose = torch.from_numpy(pose['leye_pose'][temporal_frame_indices]).to('cuda')
+                temporal_reye_pose = torch.from_numpy(pose['reye_pose'][temporal_frame_indices]).to('cuda')
+                temporal_neck_pose = torch.from_numpy(pose['neck_pose'][temporal_frame_indices]).to('cuda')
+
+                primary_slice = slice(temporal_primary_index, temporal_primary_index + 1)
+                expression = temporal_expression[primary_slice]
+                jaw_pose = temporal_jaw_pose[primary_slice]
+                leye_pose = temporal_leye_pose[primary_slice]
+                reye_pose = temporal_reye_pose[primary_slice]
+                neck_pose = temporal_neck_pose[primary_slice]
+            else:
+                _, pose = sample_pose_sequence(self.pose_sources)
+                idx2 = random.randint(0, pose['expression'].shape[0] - 1)
+                expression = torch.from_numpy(pose['expression'][idx2: idx2 + 1]).to('cuda')
+                jaw_pose = torch.from_numpy(pose['jaw_pose'][idx2: idx2 + 1]).to('cuda')
+                leye_pose = torch.from_numpy(pose['leye_pose'][idx2: idx2 + 1]).to('cuda')
+                reye_pose = torch.from_numpy(pose['reye_pose'][idx2: idx2 + 1]).to('cuda')
+                neck_pose = torch.from_numpy(pose['neck_pose'][idx2: idx2 + 1]).to('cuda')
         else:
             expression = None
             jaw_pose = None
@@ -499,6 +621,18 @@ class RandomCameraIterableDataset(IterableDataset, Updateable):
             'leye_pose': leye_pose,
             'reye_pose': reye_pose,
             'neck_pose': neck_pose,
+            "temporal_enabled": temporal_enabled,
+            "temporal_source_name": temporal_source_name,
+            "temporal_source_index": temporal_source_index,
+            "temporal_sequence_index": temporal_sequence_index,
+            "temporal_frame_indices": temporal_frame_indices,
+            "temporal_primary_index": temporal_primary_index,
+            "temporal_window_length": temporal_window_length,
+            "temporal_expression": temporal_expression,
+            "temporal_jaw_pose": temporal_jaw_pose,
+            "temporal_leye_pose": temporal_leye_pose,
+            "temporal_reye_pose": temporal_reye_pose,
+            "temporal_neck_pose": temporal_neck_pose,
         }
 
 

@@ -182,6 +182,45 @@ class GaussianFlameModel(GaussianModel):
         barycentric = torch.stack([u, v, w], dim=1)
         return barycentric, normal_offset
 
+    def get_temporal_surface_states(self, expression, jaw_pose, leye_pose=None, reye_pose=None, neck_pose=None):
+        saved_expression = self._expression
+        saved_jaw_pose = self._jaw_pose
+        saved_leye_pose = self._leye_pose
+        saved_reye_pose = self._reye_pose
+        saved_neck_pose = self._neck_pose
+
+        states = []
+        try:
+            for index in range(expression.shape[0]):
+                self._expression = expression[index:index + 1].detach()
+                self._jaw_pose = jaw_pose[index:index + 1].detach()
+                if leye_pose is not None:
+                    self._leye_pose = leye_pose[index:index + 1].detach()
+                if reye_pose is not None:
+                    self._reye_pose = reye_pose[index:index + 1].detach()
+                if neck_pose is not None:
+                    self._neck_pose = neck_pose[index:index + 1].detach()
+
+                triangle_centroid, _, triangle_area = self.get_trans_matrix()
+                scaling = self.get_scaling
+                states.append(
+                    {
+                        "xyz": self.get_xyz,
+                        "triangle_centroid": triangle_centroid,
+                        "triangle_area": triangle_area,
+                        "scaling": scaling,
+                        "scale_ratio": scaling / ((triangle_area + 1e-10).sqrt().unsqueeze(-1)),
+                    }
+                )
+        finally:
+            self._expression = saved_expression
+            self._jaw_pose = saved_jaw_pose
+            self._leye_pose = saved_leye_pose
+            self._reye_pose = saved_reye_pose
+            self._neck_pose = saved_neck_pose
+
+        return states
+
     @property
     def get_scaling(self):
         T, R, S = self.get_trans_matrix()

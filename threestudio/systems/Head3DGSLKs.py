@@ -54,6 +54,7 @@ class Head3DGSLKsRig(BaseLift3DSystem):
         area_relax: bool = False
         shape_update_end_step: int = 12000
         surface_constraint_start_step: int = 2400
+        temporal_loss_start_step: int = 2400
         training_w_animation: bool = True
         use_eye_pose: bool = False
         use_neck_pose: bool = False
@@ -88,6 +89,8 @@ class Head3DGSLKsRig(BaseLift3DSystem):
         self.cfg.loss.lambda_scaling = 0.01 * self.cfg.loss.lambda_scaling
         self.cfg.loss.lambda_barycentric_inside = 0.01 * self.cfg.loss.lambda_barycentric_inside
         self.cfg.loss.lambda_normal_offset = 0.01 * self.cfg.loss.lambda_normal_offset
+        self.cfg.loss.lambda_temporal_motion = 0.01 * self.cfg.loss.lambda_temporal_motion
+        self.cfg.loss.lambda_temporal_scale_ratio = 0.01 * self.cfg.loss.lambda_temporal_scale_ratio
         if self.cfg.area_relax:
             reduction = 'none'
         else:
@@ -205,6 +208,35 @@ class Head3DGSLKsRig(BaseLift3DSystem):
         )
         self.guidance = threestudio.find(self.cfg.guidance_type)(self.cfg.guidance)
 
+    def compute_temporal_losses(self, batch):
+        states = self.gaussian.get_temporal_surface_states(
+            batch["temporal_expression"],
+            batch["temporal_jaw_pose"],
+            batch["temporal_leye_pose"] if self.cfg.use_eye_pose else None,
+            batch["temporal_reye_pose"] if self.cfg.use_eye_pose else None,
+            batch.get("temporal_neck_pose", None) if self.cfg.use_neck_pose else None,
+        )
+
+        if len(states) < 2:
+            zero = states[0]["xyz"].new_tensor(0.0)
+            return {"motion": zero, "scale_ratio": zero}
+
+        motion_losses = []
+        scale_ratio_losses = []
+        for index in range(len(states) - 1):
+            current = states[index]
+            next_state = states[index + 1]
+
+            gaussian_motion = next_state["xyz"] - current["xyz"]
+            triangle_motion = next_state["triangle_centroid"] - current["triangle_centroid"]
+            motion_losses.append(torch.norm(gaussian_motion - triangle_motion, dim=-1).mean())
+            scale_ratio_losses.append(torch.abs(next_state["scale_ratio"] - current["scale_ratio"]).mean())
+
+        return {
+            "motion": torch.stack(motion_losses).mean(),
+            "scale_ratio": torch.stack(scale_ratio_losses).mean(),
+        }
+
     def training_step(self, batch, batch_idx):
 
         self.gaussian.update_learning_rate(self.true_global_step)
@@ -274,6 +306,16 @@ class Head3DGSLKsRig(BaseLift3DSystem):
             self.log("train/loss_normal_offset", loss_normal_offset)
             loss += loss_barycentric_inside * lambda_barycentric_inside
             loss += loss_normal_offset * lambda_normal_offset
+
+        lambda_temporal_motion = self.C(self.cfg.loss.lambda_temporal_motion)
+        lambda_temporal_scale_ratio = self.C(self.cfg.loss.lambda_temporal_scale_ratio)
+        if batch.get("temporal_enabled", False) and self.true_global_step >= self.cfg.temporal_loss_start_step and (
+                lambda_temporal_motion > 0.0 or lambda_temporal_scale_ratio > 0.0):
+            temporal_losses = self.compute_temporal_losses(batch)
+            self.log("train/loss_temporal_motion", temporal_losses["motion"])
+            self.log("train/loss_temporal_scale_ratio", temporal_losses["scale_ratio"])
+            loss += temporal_losses["motion"] * lambda_temporal_motion
+            loss += temporal_losses["scale_ratio"] * lambda_temporal_scale_ratio
 
         loss_shape = torch.norm(self.gaussian._shape)
         self.log("train/loss_shape", loss_shape)
