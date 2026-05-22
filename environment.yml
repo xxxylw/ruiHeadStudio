@@ -1,4 +1,4 @@
-name: ruiheadstudio
+name: ruiheadstudio-bnbfix
 channels:
   - pytorch
   - nvidia
