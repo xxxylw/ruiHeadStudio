@@ -110,11 +110,12 @@ system:
     lambda_sds: 1.
     lambda_sparsity: 1.
     lambda_opaque: 0.0
-    lambda_position: 10.0
-    lambda_scaling: 10.0
+    lambda_position: 0.0
+    lambda_scaling: 0.0
+    lambda_local_position: 20.0
     lambda_barycentric_inside: 0.0
     lambda_normal_offset: 0.0
-    lambda_scale_ratio: 2.0
+    lambda_scale_ratio: 5.0
     lambda_temporal_motion: 0.1
     lambda_temporal_scale_ratio: 0.02
     lambda_shape: 0.0

@@ -14,8 +14,10 @@
    - 代码内部会对这些权重乘 `0.01`，所以实际进入总 loss 的权重较小，属于保守开启。
    - `temporal_loss_start_step` 保持 `2400`，避免在早期 densify/prune 不稳定阶段过早约束动画几何。
 
-3. 新增 Local Scale Ratio Loss
-   - 在原有 `loss_scaling` 之外，新增一个局部 scale ratio 约束，先与旧 scale loss 并存。
+3. 新增默认局部 Gaussian 约束
+   - 将旧 `lambda_position` 和 `lambda_scaling` 默认设为 `0.0`，默认训练不再计算旧 position/scale loss。
+   - 新增 `lambda_local_position`，复用原有局部位置约束公式，但使用新的配置名和日志名，作为默认位置约束。
+   - 新增局部 scale ratio 约束，作为默认尺度约束。
    - 新配置：
 
 ```yaml
@@ -23,7 +25,10 @@ system:
   scale_ratio_threshold: 0.5
 
   loss:
-    lambda_scale_ratio: 2.0
+    lambda_position: 0.0
+    lambda_scaling: 0.0
+    lambda_local_position: 20.0
+    lambda_scale_ratio: 5.0
 ```
 
    - 新 loss 的核心计算是：
@@ -52,12 +57,15 @@ exp(scale) > 8:  14
 
 原有 `loss_scaling` 会惩罚超过局部三角面尺度的 Gaussian，但它直接对 world scale 做 L1 约束。新增的 Local Scale Ratio Loss 更贴近当前位置约束的思路：都以绑定 FLAME 三角面为局部参考系，限制 Gaussian 不要相对自己的绑定三角面异常膨胀。
 
+同时，默认位置约束也切到新的 `lambda_local_position` 入口。它第一版复用原有 position 公式，仍从 `prune_only_start_step=2400` 后生效，但默认权重提高到 `20.0`。代码内部会乘 `0.01`，所以有效权重为 `0.2`，用于承担旧 position/scale 默认关闭后的主要 GS 稳定约束。
+
 ## 当前状态
 
 - Temporal window 默认开启，但仍只渲染 primary frame，不额外增加 SDS 渲染成本。
 - Temporal motion / scale-ratio loss 默认保守开启，用于减少相邻表情帧之间的几何抖动。
-- Local Scale Ratio Loss 默认开启，作为旧 scale loss 的补充，用于压制少量大尺度 Gaussian outlier。
-- 旧 `lambda_scaling` 暂时保留，方便对比新旧 scale 约束叠加后的效果；如果后续实验确认新 loss 效果更稳定，可以考虑逐步替代旧 scale loss。
+- 旧 `lambda_position` 和 `lambda_scaling` 默认关闭；只有命令行显式设置为正值时才会计算和记录旧 loss。
+- `lambda_local_position` 默认开启，用于约束 Gaussian 不要离绑定三角形局部中心太远。
+- Local Scale Ratio Loss 默认开启，用于压制少量大尺度 Gaussian outlier。
 
 ## 验证
 
@@ -78,4 +86,4 @@ git diff --check -- configs/headstudio.yaml threestudio/systems/Head3DGSLKs.py t
 1. 用相同 prompt 重新跑一组 Thor temporal 训练，对比头盔高亮 streak 和大 scale 椭球是否减少。
 2. 重点观察 `train/loss_scale_ratio`、`train/loss_scaling` 和测试视角中的金属高光区域。
 3. 如果仍有明显可见 outlier，下一步尝试 opacity-weighted scale ratio penalty。
-4. 如果新 ratio loss 效果稳定，再考虑降低旧 `lambda_scaling` 或移除旧 scale loss，减少重复约束。
+4. 如果新局部约束效果稳定，后续可以继续保留旧 `lambda_position` / `lambda_scaling` 作为兼容入口，但不再作为默认训练路径。

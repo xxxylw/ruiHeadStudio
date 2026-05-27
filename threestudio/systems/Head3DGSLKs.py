@@ -87,6 +87,7 @@ class Head3DGSLKsRig(BaseLift3DSystem):
         self.cameras_extent = 4.0
 
         self.cfg.loss.lambda_position = 0.01 * self.cfg.loss.lambda_position
+        self.cfg.loss.lambda_local_position = 0.01 * self.cfg.loss.lambda_local_position
         self.cfg.loss.lambda_scaling = 0.01 * self.cfg.loss.lambda_scaling
         self.cfg.loss.lambda_barycentric_inside = 0.01 * self.cfg.loss.lambda_barycentric_inside
         self.cfg.loss.lambda_normal_offset = 0.01 * self.cfg.loss.lambda_normal_offset
@@ -273,27 +274,39 @@ class Head3DGSLKsRig(BaseLift3DSystem):
 
         loss = loss + guidance_out['loss_sds'] * self.C(self.cfg.loss['lambda_sds'])
 
-        # scaling = self.gaussian.get_scaling.max(dim=1).values
-        scaling = self.gaussian.get_scaling
-        tris_scaling = self.gaussian.get_tris_scaling.max(dim=1).values
-        big_points_ws = scaling > (0.5 * tris_scaling).unsqueeze(-1)
-        loss_scaling = self.l1_scaling(scaling[big_points_ws], torch.zeros_like(scaling[big_points_ws]))
-        if self.cfg.area_relax:
-            T, R, S = self.gaussian.get_trans_matrix()
-            loss_scaling = (loss_scaling / (
-                    S.unsqueeze(-1).repeat(1, 3)[big_points_ws] + 1e-10)).mean()
-        self.log("train/loss_scaling", loss_scaling)
-        loss += loss_scaling * self.C(self.cfg.loss.lambda_scaling)
+        lambda_scaling = self.C(self.cfg.loss.lambda_scaling)
+        lambda_scale_ratio = self.C(self.cfg.loss.lambda_scale_ratio)
+        lambda_position = self.C(self.cfg.loss.lambda_position)
+        lambda_local_position = self.C(self.cfg.loss.lambda_local_position)
+        position_loss_active = self.true_global_step >= self.cfg.prune_only_start_step and (
+                lambda_position > 0.0 or lambda_local_position > 0.0
+        )
+        scale_loss_active = lambda_scaling > 0.0 or lambda_scale_ratio > 0.0
 
-        scale_ratio = scaling / (tris_scaling.unsqueeze(-1) + 1e-10)
-        scale_ratio_excess = F.relu(scale_ratio - self.cfg.scale_ratio_threshold)
-        loss_scale_ratio = (scale_ratio_excess ** 2).mean()
-        # Opacity weighting is intentionally left out for the first ratio-loss experiment.
-        # If visible outliers remain, try weighting this penalty by detached opacity.
-        self.log("train/loss_scale_ratio", loss_scale_ratio)
-        loss += loss_scale_ratio * self.C(self.cfg.loss.lambda_scale_ratio)
+        if scale_loss_active or position_loss_active:
+            scaling = self.gaussian.get_scaling
+            tris_scaling = self.gaussian.get_tris_scaling.max(dim=1).values
 
-        if self.true_global_step >= self.cfg.prune_only_start_step:
+        if lambda_scaling > 0.0:
+            big_points_ws = scaling > (0.5 * tris_scaling).unsqueeze(-1)
+            loss_scaling = self.l1_scaling(scaling[big_points_ws], torch.zeros_like(scaling[big_points_ws]))
+            if self.cfg.area_relax:
+                T, R, S = self.gaussian.get_trans_matrix()
+                loss_scaling = (loss_scaling / (
+                        S.unsqueeze(-1).repeat(1, 3)[big_points_ws] + 1e-10)).mean()
+            self.log("train/loss_scaling", loss_scaling)
+            loss += loss_scaling * lambda_scaling
+
+        if lambda_scale_ratio > 0.0:
+            scale_ratio = scaling / (tris_scaling.unsqueeze(-1) + 1e-10)
+            scale_ratio_excess = F.relu(scale_ratio - self.cfg.scale_ratio_threshold)
+            loss_scale_ratio = (scale_ratio_excess ** 2).mean()
+            # Opacity weighting is intentionally left out for the first ratio-loss experiment.
+            # If visible outliers remain, try weighting this penalty by detached opacity.
+            self.log("train/loss_scale_ratio", loss_scale_ratio)
+            loss += loss_scale_ratio * lambda_scale_ratio
+
+        if position_loss_active:
             position_threshold = 0.5 * tris_scaling
             T, R, S = self.gaussian.get_trans_matrix()
             xyz = self.gaussian.get_xyz - T
@@ -302,8 +315,12 @@ class Head3DGSLKsRig(BaseLift3DSystem):
             loss_position = self.smoothl1_position(position[mask], torch.zeros_like(position[mask]))
             if self.cfg.area_relax:
                 loss_position = (loss_position / (S[mask] + 1e-10)).mean()
-            self.log("train/loss_position", loss_position)
-            loss += loss_position * self.C(self.cfg.loss.lambda_position)
+            if lambda_position > 0.0:
+                self.log("train/loss_position", loss_position)
+                loss += loss_position * lambda_position
+            if lambda_local_position > 0.0:
+                self.log("train/loss_local_position", loss_position)
+                loss += loss_position * lambda_local_position
 
         lambda_barycentric_inside = self.C(self.cfg.loss.lambda_barycentric_inside)
         lambda_normal_offset = self.C(self.cfg.loss.lambda_normal_offset)
