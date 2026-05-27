@@ -23,7 +23,7 @@ def test_temporal_window_config_and_batch_contract_are_declared():
         assert field in data_source
 
     for key in [
-        "temporal_window_enabled: false",
+        "temporal_window_enabled: true",
         "temporal_window_length: 2",
         "temporal_window_stride: 1",
         "temporal_primary_index: 0",
@@ -69,8 +69,8 @@ def test_system_temporal_losses_are_configured_and_gated():
 
     assert "temporal_loss_start_step: int = 2400" in system_source
     assert "temporal_loss_start_step: 2400" in config
-    assert "lambda_temporal_motion: 0.0" in config
-    assert "lambda_temporal_scale_ratio: 0.0" in config
+    assert "lambda_temporal_motion: 0.1" in config
+    assert "lambda_temporal_scale_ratio: 0.02" in config
 
     assert "self.cfg.loss.lambda_temporal_motion = 0.01 * self.cfg.loss.lambda_temporal_motion" in system_source
     assert "self.cfg.loss.lambda_temporal_scale_ratio = 0.01 * self.cfg.loss.lambda_temporal_scale_ratio" in system_source

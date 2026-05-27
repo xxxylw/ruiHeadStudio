@@ -55,6 +55,7 @@ class Head3DGSLKsRig(BaseLift3DSystem):
         shape_update_end_step: int = 12000
         surface_constraint_start_step: int = 2400
         temporal_loss_start_step: int = 2400
+        scale_ratio_threshold: float = 0.5
         training_w_animation: bool = True
         use_eye_pose: bool = False
         use_neck_pose: bool = False
@@ -91,6 +92,7 @@ class Head3DGSLKsRig(BaseLift3DSystem):
         self.cfg.loss.lambda_normal_offset = 0.01 * self.cfg.loss.lambda_normal_offset
         self.cfg.loss.lambda_temporal_motion = 0.01 * self.cfg.loss.lambda_temporal_motion
         self.cfg.loss.lambda_temporal_scale_ratio = 0.01 * self.cfg.loss.lambda_temporal_scale_ratio
+        self.cfg.loss.lambda_scale_ratio = 0.01 * self.cfg.loss.lambda_scale_ratio
         if self.cfg.area_relax:
             reduction = 'none'
         else:
@@ -282,6 +284,14 @@ class Head3DGSLKsRig(BaseLift3DSystem):
                     S.unsqueeze(-1).repeat(1, 3)[big_points_ws] + 1e-10)).mean()
         self.log("train/loss_scaling", loss_scaling)
         loss += loss_scaling * self.C(self.cfg.loss.lambda_scaling)
+
+        scale_ratio = scaling / (tris_scaling.unsqueeze(-1) + 1e-10)
+        scale_ratio_excess = F.relu(scale_ratio - self.cfg.scale_ratio_threshold)
+        loss_scale_ratio = (scale_ratio_excess ** 2).mean()
+        # Opacity weighting is intentionally left out for the first ratio-loss experiment.
+        # If visible outliers remain, try weighting this penalty by detached opacity.
+        self.log("train/loss_scale_ratio", loss_scale_ratio)
+        loss += loss_scale_ratio * self.C(self.cfg.loss.lambda_scale_ratio)
 
         if self.true_global_step >= self.cfg.prune_only_start_step:
             position_threshold = 0.5 * tris_scaling
