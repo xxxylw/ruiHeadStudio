@@ -97,7 +97,7 @@ def sample_pose_window_from_source(
     cursor = cursors[source_index]
     num_sequences = len(source.sequences)
 
-    for _ in range(num_sequences):
+    for _ in range(num_sequences + 1):
         sequence_index = cursor["sequence_index"]
         sequence = source.sequences[sequence_index]
         frame_count = _sequence_frame_count(sequence)

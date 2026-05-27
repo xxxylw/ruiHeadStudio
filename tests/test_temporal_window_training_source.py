@@ -1,7 +1,12 @@
 from pathlib import Path
+import sys
+from dataclasses import dataclass
+
+import numpy as np
 
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
 
 
 def test_temporal_window_config_and_batch_contract_are_declared():
@@ -79,7 +84,48 @@ def test_system_temporal_losses_are_configured_and_gated():
     assert 'self.log("train/loss_temporal_scale_ratio", temporal_losses["scale_ratio"])' in system_source
 
 
+def test_temporal_window_sampler_wraps_single_sequence_after_end():
+    source = (ROOT / "threestudio/data/uncond_rand_exp.py").read_text()
+    sampler_source = source[
+        source.index("@dataclass\nclass PoseSource") : source.index(
+            "\n@dataclass\nclass RandomCameraDataModuleConfig"
+        )
+    ]
+    namespace = {
+        "dataclass": dataclass,
+        "np": np,
+        "random": __import__("random"),
+        "List": list,
+        "Dict": dict,
+    }
+    exec(sampler_source, namespace)
+    PoseSource = namespace["PoseSource"]
+    create_pose_source_cursors = namespace["create_pose_source_cursors"]
+    sample_pose_window_from_source = namespace[
+        "sample_pose_window_from_source"
+    ]
+
+    sequence = {
+        "expression": np.zeros((3, 100), dtype=np.float32),
+        "jaw_pose": np.zeros((3, 3), dtype=np.float32),
+        "leye_pose": np.zeros((3, 3), dtype=np.float32),
+        "reye_pose": np.zeros((3, 3), dtype=np.float32),
+        "neck_pose": np.zeros((3, 3), dtype=np.float32),
+    }
+    sources = [PoseSource(name="talkshow", weight=1.0, sequences=[sequence])]
+    cursors = create_pose_source_cursors(sources)
+
+    first = sample_pose_window_from_source(sources, cursors, 0, window_length=2)
+    second = sample_pose_window_from_source(sources, cursors, 0, window_length=2)
+    wrapped = sample_pose_window_from_source(sources, cursors, 0, window_length=2)
+
+    assert first["frame_indices"] == [0, 1]
+    assert second["frame_indices"] == [1, 2]
+    assert wrapped["frame_indices"] == [0, 1]
+
+
 if __name__ == "__main__":
     test_temporal_window_config_and_batch_contract_are_declared()
     test_gaussian_temporal_state_helper_preserves_pose_and_exposes_scale_ratio()
     test_system_temporal_losses_are_configured_and_gated()
+    test_temporal_window_sampler_wraps_single_sequence_after_end()
