@@ -17,8 +17,8 @@ def test_headstudio_uses_soft_barycentric_and_normal_offset_losses():
     config = (ROOT / "configs/headstudio.yaml").read_text()
     source = (ROOT / "threestudio/systems/Head3DGSLKs.py").read_text()
 
-    assert "lambda_barycentric_inside: 0.0" in config
-    assert "lambda_normal_offset: 0.0" in config
+    assert "lambda_barycentric_inside: 0.5" in config
+    assert "lambda_normal_offset: 0.2" in config
     assert "surface_constraint_start_step: 2400" in config
 
     assert "surface_constraint_start_step: int = 2400" in source

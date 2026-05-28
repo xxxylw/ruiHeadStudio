@@ -207,7 +207,7 @@ class RandomCameraDataModuleConfig:
 
     training_w_animation: bool = True
     temporal_window_enabled: bool = False
-    temporal_window_length: int = 2
+    temporal_window_length: int = 3
     temporal_window_stride: int = 1
     temporal_primary_index: int = 0
     temporal_same_camera: bool = True

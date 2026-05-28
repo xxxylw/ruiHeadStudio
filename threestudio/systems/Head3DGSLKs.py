@@ -93,6 +93,9 @@ class Head3DGSLKsRig(BaseLift3DSystem):
         self.cfg.loss.lambda_normal_offset = 0.01 * self.cfg.loss.lambda_normal_offset
         self.cfg.loss.lambda_temporal_motion = 0.01 * self.cfg.loss.lambda_temporal_motion
         self.cfg.loss.lambda_temporal_scale_ratio = 0.01 * self.cfg.loss.lambda_temporal_scale_ratio
+        self.cfg.loss.lambda_temporal_local_offset = 0.01 * self.cfg.loss.lambda_temporal_local_offset
+        self.cfg.loss.lambda_temporal_local_offset_accel = 0.01 * self.cfg.loss.lambda_temporal_local_offset_accel
+        self.cfg.loss.lambda_temporal_scale_ratio_accel = 0.01 * self.cfg.loss.lambda_temporal_scale_ratio_accel
         self.cfg.loss.lambda_scale_ratio = 0.01 * self.cfg.loss.lambda_scale_ratio
         if self.cfg.area_relax:
             reduction = 'none'
@@ -222,10 +225,17 @@ class Head3DGSLKsRig(BaseLift3DSystem):
 
         if len(states) < 2:
             zero = states[0]["xyz"].new_tensor(0.0)
-            return {"motion": zero, "scale_ratio": zero}
+            return {
+                "motion": zero,
+                "scale_ratio": zero,
+                "local_offset": zero,
+                "local_offset_accel": zero,
+                "scale_ratio_accel": zero,
+            }
 
         motion_losses = []
         scale_ratio_losses = []
+        local_offset_losses = []
         for index in range(len(states) - 1):
             current = states[index]
             next_state = states[index + 1]
@@ -234,10 +244,31 @@ class Head3DGSLKsRig(BaseLift3DSystem):
             triangle_motion = next_state["triangle_centroid"] - current["triangle_centroid"]
             motion_losses.append(torch.norm(gaussian_motion - triangle_motion, dim=-1).mean())
             scale_ratio_losses.append(torch.abs(next_state["scale_ratio"] - current["scale_ratio"]).mean())
+            local_offset_losses.append(torch.norm(next_state["local_offset"] - current["local_offset"], dim=-1).mean())
+
+        local_offset_accel_losses = []
+        scale_ratio_accel_losses = []
+        for index in range(len(states) - 2):
+            current = states[index]
+            next_state = states[index + 1]
+            next_next_state = states[index + 2]
+
+            local_offset_accel = next_next_state["local_offset"] - 2 * next_state["local_offset"] + current[
+                "local_offset"]
+            scale_ratio_accel = next_next_state["scale_ratio"] - 2 * next_state["scale_ratio"] + current["scale_ratio"]
+            local_offset_accel_losses.append(torch.norm(local_offset_accel, dim=-1).mean())
+            scale_ratio_accel_losses.append(torch.abs(scale_ratio_accel).mean())
+
+        zero = states[0]["xyz"].new_tensor(0.0)
 
         return {
             "motion": torch.stack(motion_losses).mean(),
             "scale_ratio": torch.stack(scale_ratio_losses).mean(),
+            "local_offset": torch.stack(local_offset_losses).mean(),
+            "local_offset_accel": torch.stack(local_offset_accel_losses).mean() if len(
+                local_offset_accel_losses) > 0 else zero,
+            "scale_ratio_accel": torch.stack(scale_ratio_accel_losses).mean() if len(
+                scale_ratio_accel_losses) > 0 else zero,
         }
 
     def training_step(self, batch, batch_idx):
@@ -336,13 +367,31 @@ class Head3DGSLKsRig(BaseLift3DSystem):
 
         lambda_temporal_motion = self.C(self.cfg.loss.lambda_temporal_motion)
         lambda_temporal_scale_ratio = self.C(self.cfg.loss.lambda_temporal_scale_ratio)
+        lambda_temporal_local_offset = self.C(self.cfg.loss.lambda_temporal_local_offset)
+        lambda_temporal_local_offset_accel = self.C(self.cfg.loss.lambda_temporal_local_offset_accel)
+        lambda_temporal_scale_ratio_accel = self.C(self.cfg.loss.lambda_temporal_scale_ratio_accel)
         if batch.get("temporal_enabled", False) and self.true_global_step >= self.cfg.temporal_loss_start_step and (
-                lambda_temporal_motion > 0.0 or lambda_temporal_scale_ratio > 0.0):
+                lambda_temporal_motion > 0.0
+                or lambda_temporal_scale_ratio > 0.0
+                or lambda_temporal_local_offset > 0.0
+                or lambda_temporal_local_offset_accel > 0.0
+                or lambda_temporal_scale_ratio_accel > 0.0):
             temporal_losses = self.compute_temporal_losses(batch)
-            self.log("train/loss_temporal_motion", temporal_losses["motion"])
-            self.log("train/loss_temporal_scale_ratio", temporal_losses["scale_ratio"])
-            loss += temporal_losses["motion"] * lambda_temporal_motion
-            loss += temporal_losses["scale_ratio"] * lambda_temporal_scale_ratio
+            if lambda_temporal_motion > 0.0:
+                self.log("train/loss_temporal_motion", temporal_losses["motion"])
+                loss += temporal_losses["motion"] * lambda_temporal_motion
+            if lambda_temporal_scale_ratio > 0.0:
+                self.log("train/loss_temporal_scale_ratio", temporal_losses["scale_ratio"])
+                loss += temporal_losses["scale_ratio"] * lambda_temporal_scale_ratio
+            if lambda_temporal_local_offset > 0.0:
+                self.log("train/loss_temporal_local_offset", temporal_losses["local_offset"])
+                loss += temporal_losses["local_offset"] * lambda_temporal_local_offset
+            if lambda_temporal_local_offset_accel > 0.0:
+                self.log("train/loss_temporal_local_offset_accel", temporal_losses["local_offset_accel"])
+                loss += temporal_losses["local_offset_accel"] * lambda_temporal_local_offset_accel
+            if lambda_temporal_scale_ratio_accel > 0.0:
+                self.log("train/loss_temporal_scale_ratio_accel", temporal_losses["scale_ratio_accel"])
+                loss += temporal_losses["scale_ratio_accel"] * lambda_temporal_scale_ratio_accel
 
         loss_shape = torch.norm(self.gaussian._shape)
         self.log("train/loss_shape", loss_shape)

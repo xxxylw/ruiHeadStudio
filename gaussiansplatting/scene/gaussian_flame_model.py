@@ -201,13 +201,20 @@ class GaussianFlameModel(GaussianModel):
                 if neck_pose is not None:
                     self._neck_pose = neck_pose[index:index + 1].detach()
 
-                triangle_centroid, _, triangle_area = self.get_trans_matrix()
+                triangle_centroid, triangle_basis, triangle_area = self.get_trans_matrix()
+                xyz = self.get_xyz
+                local_offset = torch.bmm(
+                    triangle_basis.inverse(),
+                    ((xyz - triangle_centroid) / ((triangle_area + 1e-10).sqrt().unsqueeze(-1))).unsqueeze(-1),
+                ).squeeze(-1)
                 scaling = self.get_scaling
                 states.append(
                     {
-                        "xyz": self.get_xyz,
+                        "xyz": xyz,
                         "triangle_centroid": triangle_centroid,
+                        "triangle_basis": triangle_basis,
                         "triangle_area": triangle_area,
+                        "local_offset": local_offset,
                         "scaling": scaling,
                         "scale_ratio": scaling / ((triangle_area + 1e-10).sqrt().unsqueeze(-1)),
                     }
