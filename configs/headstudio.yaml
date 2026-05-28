@@ -116,10 +116,10 @@ system:
     lambda_barycentric_inside: 0.5
     lambda_normal_offset: 0.2
     lambda_scale_ratio: 5.0
-    lambda_temporal_motion: 0.0
+    lambda_temporal_motion: 0.1
     lambda_temporal_scale_ratio: 0.0
-    lambda_temporal_local_offset: 0.5
-    lambda_temporal_local_offset_accel: 0.2
+    lambda_temporal_local_offset: 0.0
+    lambda_temporal_local_offset_accel: 0.0
     lambda_temporal_scale_ratio_accel: 0.1
     lambda_shape: 0.0
   optimizer:

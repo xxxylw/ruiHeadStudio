@@ -72,10 +72,10 @@ def test_system_temporal_losses_are_configured_and_gated():
 
     assert "temporal_loss_start_step: int = 2400" in system_source
     assert "temporal_loss_start_step: 2400" in config
-    assert "lambda_temporal_motion: 0.0" in config
+    assert "lambda_temporal_motion: 0.1" in config
     assert "lambda_temporal_scale_ratio: 0.0" in config
-    assert "lambda_temporal_local_offset: 0.5" in config
-    assert "lambda_temporal_local_offset_accel: 0.2" in config
+    assert "lambda_temporal_local_offset: 0.0" in config
+    assert "lambda_temporal_local_offset_accel: 0.0" in config
     assert "lambda_temporal_scale_ratio_accel: 0.1" in config
 
     assert "self.cfg.loss.lambda_temporal_motion = 0.01 * self.cfg.loss.lambda_temporal_motion" in system_source
