@@ -30,7 +30,7 @@ def test_local_position_loss_replaces_old_position_default():
     config = (ROOT / "configs/headstudio.yaml").read_text()
 
     assert "lambda_position: 0.0" in config
-    assert "lambda_local_position: 20.0" in config
+    assert "lambda_local_position: 5.0" in config
     assert "self.cfg.loss.lambda_local_position = 0.01 * self.cfg.loss.lambda_local_position" in system_source
     assert "lambda_position = self.C(self.cfg.loss.lambda_position)" in system_source
     assert "lambda_local_position = self.C(self.cfg.loss.lambda_local_position)" in system_source
