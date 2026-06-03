@@ -111,7 +111,7 @@ system:
     lambda_sparsity: 1.
     lambda_opaque: 0.0
     lambda_position: 0.0
-    lambda_scaling: 0.0
+    lambda_scaling: 10.0
     lambda_local_position: 5.0
     lambda_barycentric_inside: 1.0
     lambda_normal_offset: 0.5

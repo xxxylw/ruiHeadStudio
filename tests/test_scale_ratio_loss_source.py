@@ -10,7 +10,7 @@ def test_local_scale_ratio_loss_is_configured_and_logged():
 
     assert "scale_ratio_threshold: float = 0.5" in system_source
     assert "scale_ratio_threshold: 0.5" in config
-    assert "lambda_scaling: 0.0" in config
+    assert "lambda_scaling: 10.0" in config
     assert "lambda_scale_ratio: 5.0" in config
 
     assert "self.cfg.loss.lambda_scale_ratio = 0.01 * self.cfg.loss.lambda_scale_ratio" in system_source
