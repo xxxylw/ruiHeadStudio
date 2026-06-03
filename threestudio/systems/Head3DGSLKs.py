@@ -214,13 +214,23 @@ class Head3DGSLKsRig(BaseLift3DSystem):
         )
         self.guidance = threestudio.find(self.cfg.guidance_type)(self.cfg.guidance)
 
-    def compute_temporal_losses(self, batch):
+    def compute_temporal_losses(
+            self,
+            batch,
+            compute_motion=True,
+            compute_scale_ratio=False,
+            compute_local_offset_loss=False,
+            compute_local_offset_accel=False,
+            compute_scale_ratio_accel=False,
+            include_local_offset=False,
+    ):
         states = self.gaussian.get_temporal_surface_states(
             batch["temporal_expression"],
             batch["temporal_jaw_pose"],
             batch["temporal_leye_pose"] if self.cfg.use_eye_pose else None,
             batch["temporal_reye_pose"] if self.cfg.use_eye_pose else None,
             batch.get("temporal_neck_pose", None) if self.cfg.use_neck_pose else None,
+            include_local_offset=include_local_offset,
         )
 
         if len(states) < 2:
@@ -236,35 +246,46 @@ class Head3DGSLKsRig(BaseLift3DSystem):
         motion_losses = []
         scale_ratio_losses = []
         local_offset_losses = []
-        for index in range(len(states) - 1):
-            current = states[index]
-            next_state = states[index + 1]
+        if compute_motion or compute_scale_ratio or compute_local_offset_loss:
+            for index in range(len(states) - 1):
+                current = states[index]
+                next_state = states[index + 1]
 
-            gaussian_motion = next_state["xyz"] - current["xyz"]
-            triangle_motion = next_state["triangle_centroid"] - current["triangle_centroid"]
-            motion_losses.append(torch.norm(gaussian_motion - triangle_motion, dim=-1).mean())
-            scale_ratio_losses.append(torch.abs(next_state["scale_ratio"] - current["scale_ratio"]).mean())
-            local_offset_losses.append(torch.norm(next_state["local_offset"] - current["local_offset"], dim=-1).mean())
+                if compute_motion:
+                    gaussian_motion = next_state["xyz"] - current["xyz"]
+                    triangle_motion = next_state["triangle_centroid"] - current["triangle_centroid"]
+                    motion_losses.append(torch.norm(gaussian_motion - triangle_motion, dim=-1).mean())
+                if compute_scale_ratio:
+                    scale_ratio_losses.append(torch.abs(next_state["scale_ratio"] - current["scale_ratio"]).mean())
+                if compute_local_offset_loss:
+                    local_offset_losses.append(
+                        torch.norm(next_state["local_offset"] - current["local_offset"], dim=-1).mean()
+                    )
 
         local_offset_accel_losses = []
         scale_ratio_accel_losses = []
-        for index in range(len(states) - 2):
-            current = states[index]
-            next_state = states[index + 1]
-            next_next_state = states[index + 2]
+        if compute_local_offset_accel or compute_scale_ratio_accel:
+            for index in range(len(states) - 2):
+                current = states[index]
+                next_state = states[index + 1]
+                next_next_state = states[index + 2]
 
-            local_offset_accel = next_next_state["local_offset"] - 2 * next_state["local_offset"] + current[
-                "local_offset"]
-            scale_ratio_accel = next_next_state["scale_ratio"] - 2 * next_state["scale_ratio"] + current["scale_ratio"]
-            local_offset_accel_losses.append(torch.norm(local_offset_accel, dim=-1).mean())
-            scale_ratio_accel_losses.append(torch.abs(scale_ratio_accel).mean())
+                if compute_local_offset_accel:
+                    local_offset_accel = next_next_state["local_offset"] - 2 * next_state["local_offset"] + current[
+                        "local_offset"]
+                    local_offset_accel_losses.append(torch.norm(local_offset_accel, dim=-1).mean())
+                if compute_scale_ratio_accel:
+                    scale_ratio_accel = (
+                            next_next_state["scale_ratio"] - 2 * next_state["scale_ratio"] + current["scale_ratio"]
+                    )
+                    scale_ratio_accel_losses.append(torch.abs(scale_ratio_accel).mean())
 
         zero = states[0]["xyz"].new_tensor(0.0)
 
         return {
-            "motion": torch.stack(motion_losses).mean(),
-            "scale_ratio": torch.stack(scale_ratio_losses).mean(),
-            "local_offset": torch.stack(local_offset_losses).mean(),
+            "motion": torch.stack(motion_losses).mean() if len(motion_losses) > 0 else zero,
+            "scale_ratio": torch.stack(scale_ratio_losses).mean() if len(scale_ratio_losses) > 0 else zero,
+            "local_offset": torch.stack(local_offset_losses).mean() if len(local_offset_losses) > 0 else zero,
             "local_offset_accel": torch.stack(local_offset_accel_losses).mean() if len(
                 local_offset_accel_losses) > 0 else zero,
             "scale_ratio_accel": torch.stack(scale_ratio_accel_losses).mean() if len(
@@ -376,7 +397,16 @@ class Head3DGSLKsRig(BaseLift3DSystem):
                 or lambda_temporal_local_offset > 0.0
                 or lambda_temporal_local_offset_accel > 0.0
                 or lambda_temporal_scale_ratio_accel > 0.0):
-            temporal_losses = self.compute_temporal_losses(batch)
+            include_local_offset = lambda_temporal_local_offset > 0.0 or lambda_temporal_local_offset_accel > 0.0
+            temporal_losses = self.compute_temporal_losses(
+                batch,
+                compute_motion=lambda_temporal_motion > 0.0,
+                compute_scale_ratio=lambda_temporal_scale_ratio > 0.0,
+                compute_local_offset_loss=lambda_temporal_local_offset > 0.0,
+                compute_local_offset_accel=lambda_temporal_local_offset_accel > 0.0,
+                compute_scale_ratio_accel=lambda_temporal_scale_ratio_accel > 0.0,
+                include_local_offset=include_local_offset,
+            )
             if lambda_temporal_motion > 0.0:
                 self.log("train/loss_temporal_motion", temporal_losses["motion"])
                 loss += temporal_losses["motion"] * lambda_temporal_motion

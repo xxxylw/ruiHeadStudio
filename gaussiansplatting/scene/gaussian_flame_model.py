@@ -182,7 +182,15 @@ class GaussianFlameModel(GaussianModel):
         barycentric = torch.stack([u, v, w], dim=1)
         return barycentric, normal_offset
 
-    def get_temporal_surface_states(self, expression, jaw_pose, leye_pose=None, reye_pose=None, neck_pose=None):
+    def get_temporal_surface_states(
+        self,
+        expression,
+        jaw_pose,
+        leye_pose=None,
+        reye_pose=None,
+        neck_pose=None,
+        include_local_offset=False,
+    ):
         saved_expression = self._expression
         saved_jaw_pose = self._jaw_pose
         saved_leye_pose = self._leye_pose
@@ -203,22 +211,22 @@ class GaussianFlameModel(GaussianModel):
 
                 triangle_centroid, triangle_basis, triangle_area = self.get_trans_matrix()
                 xyz = self.get_xyz
-                local_offset = torch.bmm(
-                    triangle_basis.inverse(),
-                    ((xyz - triangle_centroid) / ((triangle_area + 1e-10).sqrt().unsqueeze(-1))).unsqueeze(-1),
-                ).squeeze(-1)
                 scaling = self.get_scaling
-                states.append(
-                    {
-                        "xyz": xyz,
-                        "triangle_centroid": triangle_centroid,
-                        "triangle_basis": triangle_basis,
-                        "triangle_area": triangle_area,
-                        "local_offset": local_offset,
-                        "scaling": scaling,
-                        "scale_ratio": scaling / ((triangle_area + 1e-10).sqrt().unsqueeze(-1)),
-                    }
-                )
+                state = {
+                    "xyz": xyz,
+                    "triangle_centroid": triangle_centroid,
+                    "triangle_area": triangle_area,
+                    "scaling": scaling,
+                    "scale_ratio": scaling / ((triangle_area + 1e-10).sqrt().unsqueeze(-1)),
+                }
+                if include_local_offset:
+                    local_offset = torch.bmm(
+                        triangle_basis.inverse(),
+                        ((xyz - triangle_centroid) / ((triangle_area + 1e-10).sqrt().unsqueeze(-1))).unsqueeze(-1),
+                    ).squeeze(-1)
+                    state["triangle_basis"] = triangle_basis
+                    state["local_offset"] = local_offset
+                states.append(state)
         finally:
             self._expression = saved_expression
             self._jaw_pose = saved_jaw_pose

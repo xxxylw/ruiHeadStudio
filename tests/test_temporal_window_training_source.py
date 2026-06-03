@@ -52,6 +52,7 @@ def test_gaussian_temporal_state_helper_preserves_pose_and_exposes_scale_ratio()
     source = (ROOT / "gaussiansplatting/scene/gaussian_flame_model.py").read_text()
 
     assert "def get_temporal_surface_states(" in source
+    assert "include_local_offset=False" in source
     assert "saved_expression = self._expression" in source
     assert "try:" in source
     assert "finally:" in source
@@ -61,9 +62,10 @@ def test_gaussian_temporal_state_helper_preserves_pose_and_exposes_scale_ratio()
     assert '"triangle_centroid": triangle_centroid' in source
     assert '"triangle_area": triangle_area' in source
     assert '"scaling": scaling' in source
-    assert "local_offset = torch.bmm(" in source
-    assert '"local_offset": local_offset' in source
     assert '"scale_ratio": scaling / ((triangle_area + 1e-10).sqrt().unsqueeze(-1))' in source
+    assert "if include_local_offset:" in source
+    assert "local_offset = torch.bmm(" in source
+    assert 'state["local_offset"] = local_offset' in source
 
 
 def test_system_temporal_losses_are_configured_and_gated():
@@ -83,8 +85,9 @@ def test_system_temporal_losses_are_configured_and_gated():
     assert "self.cfg.loss.lambda_temporal_local_offset = 0.01 * self.cfg.loss.lambda_temporal_local_offset" in system_source
     assert "self.cfg.loss.lambda_temporal_local_offset_accel = 0.01 * self.cfg.loss.lambda_temporal_local_offset_accel" in system_source
     assert "self.cfg.loss.lambda_temporal_scale_ratio_accel = 0.01 * self.cfg.loss.lambda_temporal_scale_ratio_accel" in system_source
-    assert "def compute_temporal_losses(self, batch):" in system_source
-    assert "states = self.gaussian.get_temporal_surface_states(" in system_source
+    assert "def compute_temporal_losses(" in system_source
+    assert "include_local_offset = lambda_temporal_local_offset > 0.0 or lambda_temporal_local_offset_accel > 0.0" in system_source
+    assert "include_local_offset=include_local_offset" in system_source
     assert "loss_temporal_motion" in system_source
     assert "loss_temporal_scale_ratio" in system_source
     assert "loss_temporal_local_offset" in system_source
@@ -101,6 +104,17 @@ def test_system_temporal_losses_are_configured_and_gated():
     assert 'self.log("train/loss_temporal_local_offset", temporal_losses["local_offset"])' in system_source
     assert 'self.log("train/loss_temporal_local_offset_accel", temporal_losses["local_offset_accel"])' in system_source
     assert 'self.log("train/loss_temporal_scale_ratio_accel", temporal_losses["scale_ratio_accel"])' in system_source
+
+
+def test_default_temporal_losses_do_not_require_local_offset_inverse():
+    system_source = (ROOT / "threestudio/systems/Head3DGSLKs.py").read_text()
+    gaussian_source = (ROOT / "gaussiansplatting/scene/gaussian_flame_model.py").read_text()
+
+    assert "include_local_offset = lambda_temporal_local_offset > 0.0 or lambda_temporal_local_offset_accel > 0.0" in system_source
+    assert "if compute_local_offset_loss:" in system_source
+    assert "if compute_local_offset_accel:" in system_source
+    assert "triangle_basis.inverse()" in gaussian_source
+    assert "if include_local_offset:" in gaussian_source
 
 
 def test_temporal_window_sampler_wraps_single_sequence_after_end():
