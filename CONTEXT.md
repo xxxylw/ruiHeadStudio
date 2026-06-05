@@ -40,6 +40,14 @@ _Avoid_: true CFG when only one conditional prediction is run
 A small-resolution probe run that verifies FLUX ControlNet Guidance can load, consume independent pose and depth Control Conditions, produce a nonzero gradient for a Rendered RGB Sample, and fit within available GPU memory before full 3D Avatar training.
 _Avoid_: full training run
 
+**SDXL Union ControlNet Guidance**:
+A Guidance Backend based on an SDXL image prior and a union ControlNet that consumes the Rendered RGB Sample, text prompt, and one or more Control Conditions to produce an SDS-like gradient.
+_Avoid_: FLUX guidance, two separate SD1.5 ControlNets
+
+**Union Control Mode**:
+The declared control-type selection used by a union ControlNet to interpret each supplied Control Condition, such as pose or depth.
+_Avoid_: guessing control type from pixels, merging control conditions
+
 **Rendered RGB Sample**:
 The current image rendered from the 3D Avatar for a sampled camera view. In guidance, it is encoded to a latent as the optimization sample that receives gradients, not used as a reference image to preserve.
 _Avoid_: reference image, init image

@@ -324,6 +324,7 @@ class Head3DGSLKsRig(BaseLift3DSystem):
 
         loss = 0.0
 
+        self.log("train/loss_sds", guidance_out["loss_sds"])
         loss = loss + guidance_out['loss_sds'] * self.C(self.cfg.loss['lambda_sds'])
 
         lambda_scaling = self.C(self.cfg.loss.lambda_scaling)

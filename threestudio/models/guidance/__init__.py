@@ -1,3 +1,3 @@
 from . import (
-    controlnet_guidance,
+    controlnet_union_sdxl_guidance,
 )

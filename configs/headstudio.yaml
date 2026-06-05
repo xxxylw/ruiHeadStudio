@@ -83,20 +83,24 @@ system:
   use_eye_pose: False
   use_neck_pose: False
 
-  guidance_type: "controlnet-depth-guidance"
+  guidance_type: "controlnet-union-sdxl-guidance"
   guidance:
-    pretrained_model_name_or_path: "stablediffusionapi/realistic-vision-51"
-    control_type: "pose_depth"
+    pretrained_model_name_or_path: "stabilityai/stable-diffusion-xl-base-1.0"
+    vae_model_name_or_path: "madebyollin/sdxl-vae-fp16-fix"
+    controlnet_model_name_or_path: "xinsir/controlnet-union-sdxl-1.0"
+    control_modes: ["openpose", "depth"]
+    guidance_resolution: 512
     condition_scale_pose: 1.0
     condition_scale_depth: 0.8
+    control_guidance_start: [0.0, 0.0]
+    control_guidance_end: [0.65, 0.8]
+    guidance_scale: 3.0
     min_step_percent: 0.05
     max_step_percent: 0.8
-    use_nfsd: False
-    use_dsd: False
 
-  prompt_processor_type: "stable-diffusion-prompt-processor"
+  prompt_processor_type: "stable-diffusion-xl-prompt-processor"
   prompt_processor:
-    pretrained_model_name_or_path: "stablediffusionapi/realistic-vision-51"
+    pretrained_model_name_or_path: "stabilityai/stable-diffusion-xl-base-1.0"
     prompt: "Elon Musk, RAW photo, (high detailed skin:1.2), 8k uhd, dslr, soft lighting, high quality, film grain, Fujifilm XT3"
     negative_prompt: "shadow, dark face, eyeglass, glasses, noise,pattern, strange color, (deformed iris, deformed pupils, semi-realistic, cgi, 3d, render, sketch, cartoon, drawing, anime:1.4), text, close up, cropped, out of frame, worst quality, low quality, jpeg artifacts, ugly, duplicate, morbid, mutilated, poorly drawn face, mutation, deformed, blurry, dehydrated, bad anatomy, bad proportions, extra limbs, cloned face, disfigured, gross proportions,long neck"
 
