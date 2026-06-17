@@ -53,7 +53,12 @@ class Head3DGSLKsRig(BaseLift3DSystem):
 
         area_relax: bool = False
         shape_update_end_step: int = 12000
+        surface_constraint_start_step: int = 2400
+        temporal_loss_start_step: int = 2400
+        scale_ratio_threshold: float = 0.5
         training_w_animation: bool = True
+        use_eye_pose: bool = False
+        use_neck_pose: bool = False
 
         # area scaling factor
         # area_scaling_factor: float = 1
@@ -82,7 +87,16 @@ class Head3DGSLKsRig(BaseLift3DSystem):
         self.cameras_extent = 4.0
 
         self.cfg.loss.lambda_position = 0.01 * self.cfg.loss.lambda_position
+        self.cfg.loss.lambda_local_position = 0.01 * self.cfg.loss.lambda_local_position
         self.cfg.loss.lambda_scaling = 0.01 * self.cfg.loss.lambda_scaling
+        self.cfg.loss.lambda_barycentric_inside = 0.01 * self.cfg.loss.lambda_barycentric_inside
+        self.cfg.loss.lambda_normal_offset = 0.01 * self.cfg.loss.lambda_normal_offset
+        self.cfg.loss.lambda_scale_ratio = 0.01 * self.cfg.loss.lambda_scale_ratio
+        self.cfg.loss.lambda_temporal_motion = 0.01 * self.cfg.loss.lambda_temporal_motion
+        self.cfg.loss.lambda_temporal_scale_ratio = 0.01 * self.cfg.loss.lambda_temporal_scale_ratio
+        self.cfg.loss.lambda_temporal_local_offset = 0.01 * self.cfg.loss.lambda_temporal_local_offset
+        self.cfg.loss.lambda_temporal_local_offset_accel = 0.01 * self.cfg.loss.lambda_temporal_local_offset_accel
+        self.cfg.loss.lambda_temporal_scale_ratio_accel = 0.01 * self.cfg.loss.lambda_temporal_scale_ratio_accel
         if self.cfg.area_relax:
             reduction = 'none'
         else:
@@ -130,9 +144,10 @@ class Head3DGSLKsRig(BaseLift3DSystem):
     def set_pose(self, expression, jaw_pose, leye_pose, reye_pose, neck_pose=None):
         self.gaussian._expression = expression.detach()
         self.gaussian._jaw_pose = jaw_pose.detach()
-        # self.gaussian._leye_pose = leye_pose.detach()
-        # self.gaussian._reye_pose = reye_pose.detach()
-        if neck_pose is not None:
+        if self.cfg.use_eye_pose:
+            self.gaussian._leye_pose = leye_pose.detach()
+            self.gaussian._reye_pose = reye_pose.detach()
+        if self.cfg.use_neck_pose and neck_pose is not None:
             self.gaussian._neck_pose = neck_pose.detach()
 
     def forward(self, batch: Dict[str, Any], renderbackground=None) -> Dict[str, Any]:
@@ -145,7 +160,13 @@ class Head3DGSLKsRig(BaseLift3DSystem):
         self.viewspace_point_list = []
 
         if self.cfg.training_w_animation:
-            self.set_pose(batch['expression'], batch['jaw_pose'], batch['leye_pose'], batch['reye_pose'])
+            self.set_pose(
+                batch['expression'],
+                batch['jaw_pose'],
+                batch['leye_pose'],
+                batch['reye_pose'],
+                batch.get('neck_pose', None),
+            )
 
         for id in range(batch['c2w'].shape[0]):
             viewpoint_cam = Camera(c2w=batch['c2w'][id], FoVy=batch['fovy'][id], height=batch['height'],
@@ -193,6 +214,84 @@ class Head3DGSLKsRig(BaseLift3DSystem):
         )
         self.guidance = threestudio.find(self.cfg.guidance_type)(self.cfg.guidance)
 
+    def compute_temporal_losses(
+            self,
+            batch,
+            compute_motion=True,
+            compute_scale_ratio=False,
+            compute_local_offset_loss=False,
+            compute_local_offset_accel=False,
+            compute_scale_ratio_accel=False,
+            include_local_offset=False,
+    ):
+        states = self.gaussian.get_temporal_surface_states(
+            batch["temporal_expression"],
+            batch["temporal_jaw_pose"],
+            batch["temporal_leye_pose"] if self.cfg.use_eye_pose else None,
+            batch["temporal_reye_pose"] if self.cfg.use_eye_pose else None,
+            batch.get("temporal_neck_pose", None) if self.cfg.use_neck_pose else None,
+            include_local_offset=include_local_offset,
+        )
+
+        if len(states) < 2:
+            zero = states[0]["xyz"].new_tensor(0.0)
+            return {
+                "motion": zero,
+                "scale_ratio": zero,
+                "local_offset": zero,
+                "local_offset_accel": zero,
+                "scale_ratio_accel": zero,
+            }
+
+        motion_losses = []
+        scale_ratio_losses = []
+        local_offset_losses = []
+        if compute_motion or compute_scale_ratio or compute_local_offset_loss:
+            for index in range(len(states) - 1):
+                current = states[index]
+                next_state = states[index + 1]
+
+                if compute_motion:
+                    gaussian_motion = next_state["xyz"] - current["xyz"]
+                    triangle_motion = next_state["triangle_centroid"] - current["triangle_centroid"]
+                    motion_losses.append(torch.norm(gaussian_motion - triangle_motion, dim=-1).mean())
+                if compute_scale_ratio:
+                    scale_ratio_losses.append(torch.abs(next_state["scale_ratio"] - current["scale_ratio"]).mean())
+                if compute_local_offset_loss:
+                    local_offset_losses.append(
+                        torch.norm(next_state["local_offset"] - current["local_offset"], dim=-1).mean()
+                    )
+
+        local_offset_accel_losses = []
+        scale_ratio_accel_losses = []
+        if compute_local_offset_accel or compute_scale_ratio_accel:
+            for index in range(len(states) - 2):
+                current = states[index]
+                next_state = states[index + 1]
+                next_next_state = states[index + 2]
+
+                if compute_local_offset_accel:
+                    local_offset_accel = next_next_state["local_offset"] - 2 * next_state["local_offset"] + current[
+                        "local_offset"]
+                    local_offset_accel_losses.append(torch.norm(local_offset_accel, dim=-1).mean())
+                if compute_scale_ratio_accel:
+                    scale_ratio_accel = (
+                            next_next_state["scale_ratio"] - 2 * next_state["scale_ratio"] + current["scale_ratio"]
+                    )
+                    scale_ratio_accel_losses.append(torch.abs(scale_ratio_accel).mean())
+
+        zero = states[0]["xyz"].new_tensor(0.0)
+
+        return {
+            "motion": torch.stack(motion_losses).mean() if len(motion_losses) > 0 else zero,
+            "scale_ratio": torch.stack(scale_ratio_losses).mean() if len(scale_ratio_losses) > 0 else zero,
+            "local_offset": torch.stack(local_offset_losses).mean() if len(local_offset_losses) > 0 else zero,
+            "local_offset_accel": torch.stack(local_offset_accel_losses).mean() if len(
+                local_offset_accel_losses) > 0 else zero,
+            "scale_ratio_accel": torch.stack(scale_ratio_accel_losses).mean() if len(
+                scale_ratio_accel_losses) > 0 else zero,
+        }
+
     def training_step(self, batch, batch_idx):
 
         self.gaussian.update_learning_rate(self.true_global_step)
@@ -227,19 +326,39 @@ class Head3DGSLKsRig(BaseLift3DSystem):
 
         loss = loss + guidance_out['loss_sds'] * self.C(self.cfg.loss['lambda_sds'])
 
-        # scaling = self.gaussian.get_scaling.max(dim=1).values
-        scaling = self.gaussian.get_scaling
-        tris_scaling = self.gaussian.get_tris_scaling.max(dim=1).values
-        big_points_ws = scaling > (0.5 * tris_scaling).unsqueeze(-1)
-        loss_scaling = self.l1_scaling(scaling[big_points_ws], torch.zeros_like(scaling[big_points_ws]))
-        if self.cfg.area_relax:
-            T, R, S = self.gaussian.get_trans_matrix()
-            loss_scaling = (loss_scaling / (
-                    S.unsqueeze(-1).repeat(1, 3)[big_points_ws] + 1e-10)).mean()
-        self.log("train/loss_scaling", loss_scaling)
-        loss += loss_scaling * self.C(self.cfg.loss.lambda_scaling)
+        lambda_scaling = self.C(self.cfg.loss.lambda_scaling)
+        lambda_scale_ratio = self.C(self.cfg.loss.lambda_scale_ratio)
+        lambda_position = self.C(self.cfg.loss.lambda_position)
+        lambda_local_position = self.C(self.cfg.loss.lambda_local_position)
+        position_loss_active = self.true_global_step >= self.cfg.prune_only_start_step and (
+                lambda_position > 0.0 or lambda_local_position > 0.0
+        )
+        scale_loss_active = lambda_scaling > 0.0 or lambda_scale_ratio > 0.0
 
-        if self.true_global_step >= self.cfg.prune_only_start_step:
+        if scale_loss_active or position_loss_active:
+            scaling = self.gaussian.get_scaling
+            tris_scaling = self.gaussian.get_tris_scaling.max(dim=1).values
+
+        if lambda_scaling > 0.0:
+            big_points_ws = scaling > (0.5 * tris_scaling).unsqueeze(-1)
+            loss_scaling = self.l1_scaling(scaling[big_points_ws], torch.zeros_like(scaling[big_points_ws]))
+            if self.cfg.area_relax:
+                T, R, S = self.gaussian.get_trans_matrix()
+                loss_scaling = (loss_scaling / (
+                        S.unsqueeze(-1).repeat(1, 3)[big_points_ws] + 1e-10)).mean()
+            self.log("train/loss_scaling", loss_scaling)
+            loss += loss_scaling * lambda_scaling
+
+        if lambda_scale_ratio > 0.0:
+            scale_ratio = scaling / (tris_scaling.unsqueeze(-1) + 1e-10)
+            scale_ratio_excess = F.relu(scale_ratio - self.cfg.scale_ratio_threshold)
+            loss_scale_ratio = (scale_ratio_excess ** 2).mean()
+            # Opacity weighting is intentionally left out for the first ratio-loss experiment.
+            # If visible outliers remain, try weighting this penalty by detached opacity.
+            self.log("train/loss_scale_ratio", loss_scale_ratio)
+            loss += loss_scale_ratio * lambda_scale_ratio
+
+        if position_loss_active:
             position_threshold = 0.5 * tris_scaling
             T, R, S = self.gaussian.get_trans_matrix()
             xyz = self.gaussian.get_xyz - T
@@ -248,8 +367,61 @@ class Head3DGSLKsRig(BaseLift3DSystem):
             loss_position = self.smoothl1_position(position[mask], torch.zeros_like(position[mask]))
             if self.cfg.area_relax:
                 loss_position = (loss_position / (S[mask] + 1e-10)).mean()
-            self.log("train/loss_position", loss_position)
-            loss += loss_position * self.C(self.cfg.loss.lambda_position)
+            if lambda_position > 0.0:
+                self.log("train/loss_position", loss_position)
+                loss += loss_position * lambda_position
+            if lambda_local_position > 0.0:
+                self.log("train/loss_local_position", loss_position)
+                loss += loss_position * lambda_local_position
+
+        lambda_barycentric_inside = self.C(self.cfg.loss.lambda_barycentric_inside)
+        lambda_normal_offset = self.C(self.cfg.loss.lambda_normal_offset)
+        if self.true_global_step >= self.cfg.surface_constraint_start_step and (
+                lambda_barycentric_inside > 0.0 or lambda_normal_offset > 0.0):
+            barycentric, normal_offset = self.gaussian.get_surface_constraint_terms()
+            loss_barycentric_inside = F.relu(-barycentric).mean()
+            loss_normal_offset = torch.abs(normal_offset).mean()
+            self.log("train/loss_barycentric_inside", loss_barycentric_inside)
+            self.log("train/loss_normal_offset", loss_normal_offset)
+            loss += loss_barycentric_inside * lambda_barycentric_inside
+            loss += loss_normal_offset * lambda_normal_offset
+
+        lambda_temporal_motion = self.C(self.cfg.loss.lambda_temporal_motion)
+        lambda_temporal_scale_ratio = self.C(self.cfg.loss.lambda_temporal_scale_ratio)
+        lambda_temporal_local_offset = self.C(self.cfg.loss.lambda_temporal_local_offset)
+        lambda_temporal_local_offset_accel = self.C(self.cfg.loss.lambda_temporal_local_offset_accel)
+        lambda_temporal_scale_ratio_accel = self.C(self.cfg.loss.lambda_temporal_scale_ratio_accel)
+        if batch.get("temporal_enabled", False) and self.true_global_step >= self.cfg.temporal_loss_start_step and (
+                lambda_temporal_motion > 0.0
+                or lambda_temporal_scale_ratio > 0.0
+                or lambda_temporal_local_offset > 0.0
+                or lambda_temporal_local_offset_accel > 0.0
+                or lambda_temporal_scale_ratio_accel > 0.0):
+            include_local_offset = lambda_temporal_local_offset > 0.0 or lambda_temporal_local_offset_accel > 0.0
+            temporal_losses = self.compute_temporal_losses(
+                batch,
+                compute_motion=lambda_temporal_motion > 0.0,
+                compute_scale_ratio=lambda_temporal_scale_ratio > 0.0,
+                compute_local_offset_loss=lambda_temporal_local_offset > 0.0,
+                compute_local_offset_accel=lambda_temporal_local_offset_accel > 0.0,
+                compute_scale_ratio_accel=lambda_temporal_scale_ratio_accel > 0.0,
+                include_local_offset=include_local_offset,
+            )
+            if lambda_temporal_motion > 0.0:
+                self.log("train/loss_temporal_motion", temporal_losses["motion"])
+                loss += temporal_losses["motion"] * lambda_temporal_motion
+            if lambda_temporal_scale_ratio > 0.0:
+                self.log("train/loss_temporal_scale_ratio", temporal_losses["scale_ratio"])
+                loss += temporal_losses["scale_ratio"] * lambda_temporal_scale_ratio
+            if lambda_temporal_local_offset > 0.0:
+                self.log("train/loss_temporal_local_offset", temporal_losses["local_offset"])
+                loss += temporal_losses["local_offset"] * lambda_temporal_local_offset
+            if lambda_temporal_local_offset_accel > 0.0:
+                self.log("train/loss_temporal_local_offset_accel", temporal_losses["local_offset_accel"])
+                loss += temporal_losses["local_offset_accel"] * lambda_temporal_local_offset_accel
+            if lambda_temporal_scale_ratio_accel > 0.0:
+                self.log("train/loss_temporal_scale_ratio_accel", temporal_losses["scale_ratio_accel"])
+                loss += temporal_losses["scale_ratio_accel"] * lambda_temporal_scale_ratio_accel
 
         loss_shape = torch.norm(self.gaussian._shape)
         self.log("train/loss_shape", loss_shape)

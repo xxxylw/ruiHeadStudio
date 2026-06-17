@@ -37,6 +37,11 @@ data:
 
   gender: 'generic'
   training_w_animation: True
+  temporal_window_enabled: true
+  temporal_window_length: 3
+  temporal_window_stride: 1
+  temporal_primary_index: 0
+  temporal_same_camera: true
   flame_path: "./ckpts/FLAME-2000"
   talkshow_train_path: './collection/ruiheadstudio/flame_collections/talkshow/project_converted_exp.npy'
   train_pose_inputs:
@@ -74,10 +79,15 @@ system:
   prune_size_threshold: 0.002
   half_scheduler_max_step: 3000
   size_threshold_fix_step: 1500
+  surface_constraint_start_step: 2400
+  temporal_loss_start_step: 2400
+  scale_ratio_threshold: 0.5
   apose: true
   bg_white: False
   area_relax: False
   training_w_animation: ${data.training_w_animation}
+  use_eye_pose: False
+  use_neck_pose: False
 
   guidance_type: "controlnet-depth-guidance"
   guidance:
@@ -106,8 +116,17 @@ system:
     lambda_sds: 1.
     lambda_sparsity: 1.
     lambda_opaque: 0.0
-    lambda_position: 10.0
+    lambda_position: 0.0
     lambda_scaling: 10.0
+    lambda_local_position: 5.0
+    lambda_barycentric_inside: 1.0
+    lambda_normal_offset: 0.5
+    lambda_scale_ratio: 5.0
+    lambda_temporal_motion: 0.1
+    lambda_temporal_scale_ratio: 0.0
+    lambda_temporal_local_offset: 0.0
+    lambda_temporal_local_offset_accel: 0.0
+    lambda_temporal_scale_ratio_accel: 0.1
     lambda_shape: 0.0
   optimizer:
     name: Adam
