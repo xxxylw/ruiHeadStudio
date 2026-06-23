@@ -6,7 +6,7 @@ seed: 0
 #data_type: "random-camera-w-cond-datamodule"
 data_type: "random-camera-exp-datamodule"
 data:
-  batch_size: 8
+  batch_size: 4
   eval_camera_distance: 2.0
   camera_distance_range: [ 1.5, 2.0 ]
   light_sample_strategy: "dreamfusion3dgs"
@@ -38,7 +38,7 @@ data:
   gender: 'generic'
   training_w_animation: True
   temporal_window_enabled: true
-  temporal_window_length: 3
+  temporal_window_length: 2
   temporal_window_stride: 1
   temporal_primary_index: 0
   temporal_same_camera: true

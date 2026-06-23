@@ -17,7 +17,7 @@ def test_temporal_window_config_keeps_main_pose_sources():
 
     for field in [
         "temporal_window_enabled: bool = False",
-        "temporal_window_length: int = 3",
+        "temporal_window_length: int = 2",
         "temporal_window_stride: int = 1",
         "temporal_primary_index: int = 0",
         "temporal_same_camera: bool = True",
@@ -26,7 +26,7 @@ def test_temporal_window_config_keeps_main_pose_sources():
 
     for key in [
         "temporal_window_enabled: true",
-        "temporal_window_length: 3",
+        "temporal_window_length: 2",
         "temporal_window_stride: 1",
         "temporal_primary_index: 0",
         "temporal_same_camera: true",
