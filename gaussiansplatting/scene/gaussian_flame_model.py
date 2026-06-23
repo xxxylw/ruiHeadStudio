@@ -22,6 +22,7 @@ from simple_knn._C import distCUDA2
 
 from gaussiansplatting.utils.sh_utils import RGB2SH
 from gaussiansplatting.utils.system_utils import mkdir_p
+from gaussiansplatting.scene.flame_mesh import load_flashavatar_flame_faces
 from gaussiansplatting.scene.gaussian_model import GaussianModel
 from gaussiansplatting.utils.general_utils import strip_symmetric, build_scaling_rotation_only
 from gaussiansplatting.utils.general_utils import inverse_sigmoid, get_expon_lr_func, build_rotation
@@ -61,6 +62,7 @@ class GaussianFlameModel(GaussianModel):
             num_expression_coeffs=self.num_expression,
             create_global_orient=True,
         ).to(self.device)
+        self.flame_faces = load_flashavatar_flame_faces()
 
         self.flame_scale = 0
         self.densify_scale = 1
@@ -262,7 +264,7 @@ class GaussianFlameModel(GaussianModel):
             return_verts=True
         )
         vertices = flame_output.vertices.squeeze().detach().cpu().numpy()
-        faces = flame_model.faces
+        faces = self.flame_faces
         if center is not None and scale is not None:
             vertices = (vertices - center) * scale
         vertices[:, [1, 2]] = vertices[:, [2, 1]]
@@ -303,7 +305,7 @@ class GaussianFlameModel(GaussianModel):
         # flame: triangles
         flame_output = flame_model(betas=betas, expression=expression, return_verts=True)
         vertices = flame_output.vertices.squeeze()
-        faces = torch.tensor(flame_model.faces.astype(np.int32), dtype=torch.int32, device=self.device)
+        faces = torch.tensor(self.flame_faces.astype(np.int32), dtype=torch.int32, device=self.device)
         # rescale and recenter
         vmin = vertices.min(0)[0]
         vmax = vertices.max(0)[0]

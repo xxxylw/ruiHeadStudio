@@ -25,6 +25,7 @@ from threestudio.utils.head_v2 import FlamePointswRandomExp
 import os
 import numpy as np
 import pickle
+import sys
 from pathlib import Path
 
 
@@ -223,6 +224,21 @@ def expand_pose_input_specs(paths: List[str], group_labels: List[str]) -> List[P
     return specs
 
 
+def load_pose_sequences(input_path: str) -> List[Dict[str, Any]]:
+    added_modules = []
+    if "numpy._core" not in sys.modules:
+        sys.modules["numpy._core"] = np.core
+        added_modules.append("numpy._core")
+    if "numpy._core.multiarray" not in sys.modules:
+        sys.modules["numpy._core.multiarray"] = np.core.multiarray
+        added_modules.append("numpy._core.multiarray")
+    try:
+        return list(np.load(input_path, allow_pickle=True).tolist())
+    finally:
+        for module_name in added_modules:
+            sys.modules.pop(module_name, None)
+
+
 def build_pose_training_corpus(
     specs: List[PoseInputSpec],
     group_weights: Dict[str, float],
@@ -232,7 +248,7 @@ def build_pose_training_corpus(
     group_to_source_indices: Dict[str, List[int]] = {}
 
     for spec in specs:
-        sequences = list(np.load(spec.input_path, allow_pickle=True).tolist())
+        sequences = load_pose_sequences(spec.input_path)
         source_index = len(sources)
         sources.append(
             PoseSource(
