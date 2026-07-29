@@ -13,6 +13,7 @@ import threestudio
 from threestudio.systems.base import BaseLift3DSystem
 from threestudio.utils.ops import binary_cross_entropy, dot
 from threestudio.utils.typing import *
+from threestudio.models.clip_alignment import CLIPAlignment, clip_alignment_weight
 
 from gaussiansplatting.gaussian_renderer import render
 from gaussiansplatting.scene import GaussianModel
@@ -57,6 +58,8 @@ class Head3DGSLKsRig(BaseLift3DSystem):
         temporal_loss_start_step: int = 2400
         scale_ratio_threshold: float = 0.5
         training_w_animation: bool = True
+        clip_model_name: str = "ViT-L/14"
+        clip_start_step: int = 2000
         use_eye_pose: bool = False
         use_neck_pose: bool = False
 
@@ -213,6 +216,11 @@ class Head3DGSLKsRig(BaseLift3DSystem):
             self.cfg.prompt_processor
         )
         self.guidance = threestudio.find(self.cfg.guidance_type)(self.cfg.guidance)
+        self.clip_alignment = None
+        if self.C(self.cfg.loss.lambda_clip) > 0.0:
+            self.clip_alignment = CLIPAlignment(
+                self.cfg.clip_model_name, self.cfg.prompt_processor.prompt, self.device
+            )
 
     def compute_temporal_losses(
             self,
@@ -325,6 +333,17 @@ class Head3DGSLKsRig(BaseLift3DSystem):
         loss = 0.0
 
         loss = loss + guidance_out['loss_sds'] * self.C(self.cfg.loss['lambda_sds'])
+
+        clip_weight = clip_alignment_weight(
+            self.C(self.cfg.loss.lambda_clip), self.true_global_step, self.cfg.clip_start_step
+        )
+        loss_clip = torch.zeros((), device=images.device)
+        if clip_weight > 0.0:
+            if self.clip_alignment is None:
+                raise RuntimeError("CLIP alignment was not initialized while lambda_clip is positive")
+            loss_clip = self.clip_alignment(images.permute(0, 3, 1, 2))
+            loss = loss + loss_clip * clip_weight
+        self.log("train/loss_clip", loss_clip)
 
         lambda_scaling = self.C(self.cfg.loss.lambda_scaling)
         lambda_scale_ratio = self.C(self.cfg.loss.lambda_scale_ratio)

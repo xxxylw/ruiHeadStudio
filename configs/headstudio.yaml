@@ -86,6 +86,8 @@ system:
   bg_white: False
   area_relax: False
   training_w_animation: ${data.training_w_animation}
+  clip_model_name: "ViT-L/14"
+  clip_start_step: 2000
   use_eye_pose: False
   use_neck_pose: False
 
@@ -128,6 +130,7 @@ system:
     lambda_temporal_local_offset_accel: 0.0
     lambda_temporal_scale_ratio_accel: 0.1
     lambda_shape: 0.0
+    lambda_clip: 0.0
   optimizer:
     name: Adam
     args:
