@@ -88,6 +88,8 @@ system:
   training_w_animation: ${data.training_w_animation}
   clip_model_name: "ViT-L/14"
   clip_start_step: 2000
+  clip_foreground_only: False
+  clip_use_view_prompt: False
   use_eye_pose: False
   use_neck_pose: False
 

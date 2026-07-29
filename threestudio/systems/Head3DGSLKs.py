@@ -60,6 +60,8 @@ class Head3DGSLKsRig(BaseLift3DSystem):
         training_w_animation: bool = True
         clip_model_name: str = "ViT-L/14"
         clip_start_step: int = 2000
+        clip_foreground_only: bool = False
+        clip_use_view_prompt: bool = False
         use_eye_pose: bool = False
         use_neck_pose: bool = False
 
@@ -341,7 +343,13 @@ class Head3DGSLKsRig(BaseLift3DSystem):
         if clip_weight > 0.0:
             if self.clip_alignment is None:
                 raise RuntimeError("CLIP alignment was not initialized while lambda_clip is positive")
-            loss_clip = self.clip_alignment(images.permute(0, 3, 1, 2))
+            loss_clip = self.clip_alignment(
+                images.permute(0, 3, 1, 2),
+                opacity=out["opacity"],
+                azimuth=batch["azimuth"],
+                foreground_only=self.cfg.clip_foreground_only,
+                view_dependent=self.cfg.clip_use_view_prompt,
+            )
             loss = loss + loss_clip * clip_weight
         self.log("train/loss_clip", loss_clip)
 
