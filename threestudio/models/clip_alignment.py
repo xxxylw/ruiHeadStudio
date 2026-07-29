@@ -1,5 +1,6 @@
 """Small differentiable helpers used by the optional CLIP alignment loss."""
 
+import os
 import torch
 import torch.nn.functional as F
 
@@ -22,7 +23,9 @@ class CLIPAlignment:
     def __init__(self, model_name: str, prompt: str, device: torch.device) -> None:
         import clip
 
-        self.model, _ = clip.load(model_name, device=device, download_root="~/.cache/clip")
+        self.model, _ = clip.load(
+            model_name, device=device, download_root=os.path.expanduser("~/.cache/clip")
+        )
         self.model.eval()
         for parameter in self.model.parameters():
             parameter.requires_grad_(False)

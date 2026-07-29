@@ -12,6 +12,7 @@ def test_clip_alignment_has_warmup_and_cosine_distance_contract():
     assert "return 0.0 if global_step < start_step else base_weight" in source
     assert "def cosine_alignment_loss(" in source
     assert "1.0 - F.cosine_similarity" in source
+    assert 'download_root=os.path.expanduser("~/.cache/clip")' in source
 
 
 def test_headstudio_only_loads_clip_when_its_loss_is_enabled():
