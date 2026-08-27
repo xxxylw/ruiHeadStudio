@@ -36,10 +36,19 @@ def test_headstudio_only_loads_clip_when_its_loss_is_enabled():
     assert "clip_start_step: int = 2000" in system_source
     assert "clip_foreground_only: bool = False" in system_source
     assert "clip_use_view_prompt: bool = False" in system_source
+    assert "clip_global_weight: float = 0.0" in system_source
+    assert "clip_foreground_weight: float = 0.0" in system_source
+    assert "clip_view_weight: float = 0.0" in system_source
     assert "if self.C(self.cfg.loss.lambda_clip) > 0.0:" in system_source
     assert "self.clip_alignment = CLIPAlignment(" in system_source
     assert "clip_weight = clip_alignment_weight(" in system_source
     assert "opacity=out[\"opacity\"]" in system_source
     assert "azimuth=batch[\"azimuth\"]" in system_source
+    assert "component_weights = {" in system_source
+    assert "loss_clip = loss_clip / component_total" in system_source
     assert 'self.log("train/loss_clip", loss_clip)' in system_source
+    assert 'self.log("train/loss_clip_global", loss_clip_global)' in system_source
+    assert "clip_global_weight: 0.0" in config_source
+    assert "clip_foreground_weight: 0.0" in config_source
+    assert "clip_view_weight: 0.0" in config_source
     assert "lambda_clip: 0.0" in config_source

@@ -62,6 +62,9 @@ class Head3DGSLKsRig(BaseLift3DSystem):
         clip_start_step: int = 2000
         clip_foreground_only: bool = False
         clip_use_view_prompt: bool = False
+        clip_global_weight: float = 0.0
+        clip_foreground_weight: float = 0.0
+        clip_view_weight: float = 0.0
         use_eye_pose: bool = False
         use_neck_pose: bool = False
 
@@ -340,18 +343,51 @@ class Head3DGSLKsRig(BaseLift3DSystem):
             self.C(self.cfg.loss.lambda_clip), self.true_global_step, self.cfg.clip_start_step
         )
         loss_clip = torch.zeros((), device=images.device)
+        loss_clip_global = torch.zeros((), device=images.device)
+        loss_clip_foreground = torch.zeros((), device=images.device)
+        loss_clip_view = torch.zeros((), device=images.device)
         if clip_weight > 0.0:
             if self.clip_alignment is None:
                 raise RuntimeError("CLIP alignment was not initialized while lambda_clip is positive")
-            loss_clip = self.clip_alignment(
-                images.permute(0, 3, 1, 2),
-                opacity=out["opacity"],
-                azimuth=batch["azimuth"],
-                foreground_only=self.cfg.clip_foreground_only,
-                view_dependent=self.cfg.clip_use_view_prompt,
-            )
+            image_chw = images.permute(0, 3, 1, 2)
+            component_weights = {
+                "global": float(self.cfg.clip_global_weight),
+                "foreground": float(self.cfg.clip_foreground_weight),
+                "view": float(self.cfg.clip_view_weight),
+            }
+            component_total = sum(weight for weight in component_weights.values() if weight > 0.0)
+            if component_total > 0.0:
+                if component_weights["global"] > 0.0:
+                    loss_clip_global = self.clip_alignment(image_chw)
+                    loss_clip = loss_clip + loss_clip_global * component_weights["global"]
+                if component_weights["foreground"] > 0.0:
+                    loss_clip_foreground = self.clip_alignment(
+                        image_chw, opacity=out["opacity"], foreground_only=True
+                    )
+                    loss_clip = loss_clip + loss_clip_foreground * component_weights["foreground"]
+                if component_weights["view"] > 0.0:
+                    loss_clip_view = self.clip_alignment(
+                        image_chw,
+                        opacity=out["opacity"],
+                        azimuth=batch["azimuth"],
+                        foreground_only=True,
+                        view_dependent=True,
+                    )
+                    loss_clip = loss_clip + loss_clip_view * component_weights["view"]
+                loss_clip = loss_clip / component_total
+            else:
+                loss_clip = self.clip_alignment(
+                    image_chw,
+                    opacity=out["opacity"],
+                    azimuth=batch["azimuth"],
+                    foreground_only=self.cfg.clip_foreground_only,
+                    view_dependent=self.cfg.clip_use_view_prompt,
+                )
             loss = loss + loss_clip * clip_weight
         self.log("train/loss_clip", loss_clip)
+        self.log("train/loss_clip_global", loss_clip_global)
+        self.log("train/loss_clip_foreground", loss_clip_foreground)
+        self.log("train/loss_clip_view", loss_clip_view)
 
         lambda_scaling = self.C(self.cfg.loss.lambda_scaling)
         lambda_scale_ratio = self.C(self.cfg.loss.lambda_scale_ratio)

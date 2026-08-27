@@ -90,6 +90,9 @@ system:
   clip_start_step: 2000
   clip_foreground_only: False
   clip_use_view_prompt: False
+  clip_global_weight: 0.0
+  clip_foreground_weight: 0.0
+  clip_view_weight: 0.0
   use_eye_pose: False
   use_neck_pose: False
 
