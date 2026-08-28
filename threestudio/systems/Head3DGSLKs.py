@@ -208,7 +208,11 @@ class Head3DGSLKsRig(BaseLift3DSystem):
 
         render_pkg["comp_rgb"] = images
         render_pkg["depth"] = depths
-        render_pkg["opacity"] = depths / (depths.max() + 1e-5)
+        alpha = render_pkg.get("alpha_3dgs")
+        if alpha is not None:
+            render_pkg["opacity"] = alpha.permute(1, 2, 0)
+        else:
+            render_pkg["opacity"] = depths / (depths.max() + 1e-5)
 
         return {
             **render_pkg,

@@ -44,6 +44,7 @@ def test_headstudio_only_loads_clip_when_its_loss_is_enabled():
     assert "clip_weight = clip_alignment_weight(" in system_source
     assert "opacity=out[\"opacity\"]" in system_source
     assert "azimuth=batch[\"azimuth\"]" in system_source
+    assert 'alpha = render_pkg.get("alpha_3dgs")' in system_source
     assert "component_weights = {" in system_source
     assert "loss_clip = loss_clip / component_total" in system_source
     assert 'self.log("train/loss_clip", loss_clip)' in system_source
