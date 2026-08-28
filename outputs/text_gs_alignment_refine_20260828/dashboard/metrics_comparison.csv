@@ -1,0 +1,31 @@
+run,metric,value,baseline,delta,improved
+foreground_view_clip,ViT-L/14 CLIP,0.277507,0.278400,-0.000893,no
+foreground_view_clip,ViT-B/16 CLIP,0.307239,0.313000,-0.005761,no
+foreground_view_clip,ViT-B/32 CLIP,0.298511,0.313100,-0.014589,no
+foreground_view_clip,PIQE,68.591249,59.930000,8.661249,no
+foreground_view_clip,MUSIQ,54.452843,51.360000,3.092843,yes
+global_clip_warm,ViT-L/14 CLIP,0.270631,0.278400,-0.007769,no
+global_clip_warm,ViT-B/16 CLIP,0.302638,0.313000,-0.010362,no
+global_clip_warm,ViT-B/32 CLIP,0.293552,0.313100,-0.019548,no
+global_clip_warm,PIQE,69.448099,59.930000,9.518099,no
+global_clip_warm,MUSIQ,55.540452,51.360000,4.180452,yes
+text_gs_multicomponent,ViT-L/14 CLIP,0.271995,0.278400,-0.006405,no
+text_gs_multicomponent,ViT-B/16 CLIP,0.300687,0.313000,-0.012313,no
+text_gs_multicomponent,ViT-B/32 CLIP,0.301576,0.313100,-0.011524,no
+text_gs_multicomponent,PIQE,67.922038,59.930000,7.992038,no
+text_gs_multicomponent,MUSIQ,55.929020,51.360000,4.569020,yes
+refine_global,ViT-L/14 CLIP,0.274353,0.278400,-0.004047,no
+refine_global,ViT-B/16 CLIP,0.303470,0.313000,-0.009530,no
+refine_global,ViT-B/32 CLIP,0.306624,0.313100,-0.006476,no
+refine_global,PIQE,64.574665,59.930000,4.644665,no
+refine_global,MUSIQ,55.785665,51.360000,4.425665,yes
+refine_multicomponent,ViT-L/14 CLIP,0.273504,0.278400,-0.004896,no
+refine_multicomponent,ViT-B/16 CLIP,0.312926,0.313000,-0.000074,no
+refine_multicomponent,ViT-B/32 CLIP,0.309419,0.313100,-0.003681,no
+refine_multicomponent,PIQE,65.032274,59.930000,5.102274,no
+refine_multicomponent,MUSIQ,57.048752,51.360000,5.688752,yes
+refine_semantic,ViT-L/14 CLIP,0.268077,0.278400,-0.010323,no
+refine_semantic,ViT-B/16 CLIP,0.312228,0.313000,-0.000772,no
+refine_semantic,ViT-B/32 CLIP,0.304467,0.313100,-0.008633,no
+refine_semantic,PIQE,64.750737,59.930000,4.820737,no
+refine_semantic,MUSIQ,56.273251,51.360000,4.913251,yes

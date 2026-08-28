@@ -1,0 +1,76 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="574" viewBox="0 0 900 574">
+<rect width="100%" height="100%" fill="#ffffff"/>
+<text x="24" y="32" font-family="Arial" font-size="20" font-weight="700">CLIP metrics vs HeadStudio baseline</text>
+<text x="24" y="78" font-family="Arial" font-size="12">foreground_view_clip / ViT-L/14 CLIP</text>
+<rect x="220" y="62" width="457" height="16" fill="#c44747" rx="2"/>
+<line x1="678" y1="59" x2="678" y2="82" stroke="#111" stroke-width="1"/>
+<text x="685" y="75" font-family="Arial" font-size="12">0.2775</text>
+<text x="24" y="106" font-family="Arial" font-size="12">foreground_view_clip / ViT-B/16 CLIP</text>
+<rect x="220" y="90" width="506" height="16" fill="#c44747" rx="2"/>
+<line x1="735" y1="87" x2="735" y2="110" stroke="#111" stroke-width="1"/>
+<text x="734" y="103" font-family="Arial" font-size="12">0.3072</text>
+<text x="24" y="134" font-family="Arial" font-size="12">foreground_view_clip / ViT-B/32 CLIP</text>
+<rect x="220" y="118" width="491" height="16" fill="#c44747" rx="2"/>
+<line x1="735" y1="115" x2="735" y2="138" stroke="#111" stroke-width="1"/>
+<text x="719" y="131" font-family="Arial" font-size="12">0.2985</text>
+<text x="24" y="162" font-family="Arial" font-size="12">global_clip_warm / ViT-L/14 CLIP</text>
+<rect x="220" y="146" width="445" height="16" fill="#c44747" rx="2"/>
+<line x1="678" y1="143" x2="678" y2="166" stroke="#111" stroke-width="1"/>
+<text x="673" y="159" font-family="Arial" font-size="12">0.2706</text>
+<text x="24" y="190" font-family="Arial" font-size="12">global_clip_warm / ViT-B/16 CLIP</text>
+<rect x="220" y="174" width="498" height="16" fill="#c44747" rx="2"/>
+<line x1="735" y1="171" x2="735" y2="194" stroke="#111" stroke-width="1"/>
+<text x="726" y="187" font-family="Arial" font-size="12">0.3026</text>
+<text x="24" y="218" font-family="Arial" font-size="12">global_clip_warm / ViT-B/32 CLIP</text>
+<rect x="220" y="202" width="483" height="16" fill="#c44747" rx="2"/>
+<line x1="735" y1="199" x2="735" y2="222" stroke="#111" stroke-width="1"/>
+<text x="711" y="215" font-family="Arial" font-size="12">0.2936</text>
+<text x="24" y="246" font-family="Arial" font-size="12">text_gs_multicomponent / ViT-L/14 CLIP</text>
+<rect x="220" y="230" width="447" height="16" fill="#c44747" rx="2"/>
+<line x1="678" y1="227" x2="678" y2="250" stroke="#111" stroke-width="1"/>
+<text x="675" y="243" font-family="Arial" font-size="12">0.2720</text>
+<text x="24" y="274" font-family="Arial" font-size="12">text_gs_multicomponent / ViT-B/16 CLIP</text>
+<rect x="220" y="258" width="495" height="16" fill="#c44747" rx="2"/>
+<line x1="735" y1="255" x2="735" y2="278" stroke="#111" stroke-width="1"/>
+<text x="723" y="271" font-family="Arial" font-size="12">0.3007</text>
+<text x="24" y="302" font-family="Arial" font-size="12">text_gs_multicomponent / ViT-B/32 CLIP</text>
+<rect x="220" y="286" width="496" height="16" fill="#c44747" rx="2"/>
+<line x1="735" y1="283" x2="735" y2="306" stroke="#111" stroke-width="1"/>
+<text x="724" y="299" font-family="Arial" font-size="12">0.3016</text>
+<text x="24" y="330" font-family="Arial" font-size="12">refine_global / ViT-L/14 CLIP</text>
+<rect x="220" y="314" width="451" height="16" fill="#c44747" rx="2"/>
+<line x1="678" y1="311" x2="678" y2="334" stroke="#111" stroke-width="1"/>
+<text x="679" y="327" font-family="Arial" font-size="12">0.2744</text>
+<text x="24" y="358" font-family="Arial" font-size="12">refine_global / ViT-B/16 CLIP</text>
+<rect x="220" y="342" width="499" height="16" fill="#c44747" rx="2"/>
+<line x1="735" y1="339" x2="735" y2="362" stroke="#111" stroke-width="1"/>
+<text x="727" y="355" font-family="Arial" font-size="12">0.3035</text>
+<text x="24" y="386" font-family="Arial" font-size="12">refine_global / ViT-B/32 CLIP</text>
+<rect x="220" y="370" width="505" height="16" fill="#c44747" rx="2"/>
+<line x1="735" y1="367" x2="735" y2="390" stroke="#111" stroke-width="1"/>
+<text x="733" y="383" font-family="Arial" font-size="12">0.3066</text>
+<text x="24" y="414" font-family="Arial" font-size="12">refine_multicomponent / ViT-L/14 CLIP</text>
+<rect x="220" y="398" width="450" height="16" fill="#c44747" rx="2"/>
+<line x1="678" y1="395" x2="678" y2="418" stroke="#111" stroke-width="1"/>
+<text x="678" y="411" font-family="Arial" font-size="12">0.2735</text>
+<text x="24" y="442" font-family="Arial" font-size="12">refine_multicomponent / ViT-B/16 CLIP</text>
+<rect x="220" y="426" width="515" height="16" fill="#c44747" rx="2"/>
+<line x1="735" y1="423" x2="735" y2="446" stroke="#111" stroke-width="1"/>
+<text x="743" y="439" font-family="Arial" font-size="12">0.3129</text>
+<text x="24" y="470" font-family="Arial" font-size="12">refine_multicomponent / ViT-B/32 CLIP</text>
+<rect x="220" y="454" width="509" height="16" fill="#c44747" rx="2"/>
+<line x1="735" y1="451" x2="735" y2="474" stroke="#111" stroke-width="1"/>
+<text x="737" y="467" font-family="Arial" font-size="12">0.3094</text>
+<text x="24" y="498" font-family="Arial" font-size="12">refine_semantic / ViT-L/14 CLIP</text>
+<rect x="220" y="482" width="441" height="16" fill="#c44747" rx="2"/>
+<line x1="678" y1="479" x2="678" y2="502" stroke="#111" stroke-width="1"/>
+<text x="669" y="495" font-family="Arial" font-size="12">0.2681</text>
+<text x="24" y="526" font-family="Arial" font-size="12">refine_semantic / ViT-B/16 CLIP</text>
+<rect x="220" y="510" width="514" height="16" fill="#c44747" rx="2"/>
+<line x1="735" y1="507" x2="735" y2="530" stroke="#111" stroke-width="1"/>
+<text x="742" y="523" font-family="Arial" font-size="12">0.3122</text>
+<text x="24" y="554" font-family="Arial" font-size="12">refine_semantic / ViT-B/32 CLIP</text>
+<rect x="220" y="538" width="501" height="16" fill="#c44747" rx="2"/>
+<line x1="735" y1="535" x2="735" y2="558" stroke="#111" stroke-width="1"/>
+<text x="729" y="551" font-family="Arial" font-size="12">0.3045</text>
+</svg>

@@ -95,6 +95,25 @@ Round 1 improves MUSIQ for every variant, with `text_gs_multicomponent` giving t
 
 Continue from the best Round 1 Gaussian state (`text_gs_multicomponent/runs/text_gs_multicomponent/save/last.ply`) for 3,000 steps with `gaussian_init_step=7000`, so the final checkpoint remains named `it10000`. The alignment loss will be active throughout the continuation, with foreground and view-conditioned components receiving more weight. This tests whether semantic alignment needs a longer, low-amplitude refinement window instead of a late pulse.
 
+## Round 2 Results (2026-08-28)
+
+All three continuation runs completed 3,000 refinement steps from the Round 1 `text_gs_multicomponent` checkpoint and were evaluated on the same four final views.
+
+| Run | ViT-L/14 CLIP | ViT-B/16 CLIP | ViT-B/32 CLIP | PIQE | MUSIQ |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| HeadStudio baseline | 0.278400 | 0.313000 | 0.313100 | 59.930000 | 51.360000 |
+| `refine_global` | 0.274353 | 0.303470 | 0.306624 | 64.574665 | 55.785665 |
+| `refine_multicomponent` | 0.273504 | 0.312926 | 0.309419 | 65.032274 | 57.048752 |
+| `refine_semantic` | 0.268077 | 0.312228 | 0.304467 | 64.750737 | 56.273251 |
+
+Round 2 improves MUSIQ over the baseline for every variant. The proposed `refine_multicomponent` reaches `0.312926` versus `0.313000` on ViT-B/16, but it still misses all three CLIP gates and PIQE is worse by `+5.102274`. The result supports the multi-component semantic hypothesis while showing that the foreground mask and loss amplitude need better control.
+
+During round 2, foreground alignment still used legacy depth-normalized opacity because the rasterized-alpha correction was committed after the processes started. The next round reuses the best round-2 PLY with the committed `alpha_3dgs` foreground mask.
+
+## Round 3 Plan
+
+Run the same 3,000-step continuation launcher from `refine_multicomponent/runs/refine_multicomponent/save/last.ply` with the committed rasterized-alpha foreground correction active. Preserve the exact prompt, four-view evaluation protocol, and three-way ablation in a separate output root.
+
 ## Artifacts
 
 - Training logs: `outputs/text_gs_alignment_20260827/<tag>/<tag>.train.log`
@@ -103,3 +122,5 @@ Continue from the best Round 1 Gaussian state (`text_gs_multicomponent/runs/text
 - Dashboard: `outputs/text_gs_alignment_20260827/dashboard/README.md`
 - CSV: `outputs/text_gs_alignment_20260827/dashboard/metrics_comparison.csv`
 - SVG: `outputs/text_gs_alignment_20260827/dashboard/metrics_bars.svg`
+- Round 2 metrics: `outputs/text_gs_alignment_refine_20260828/<tag>/eval/all_metrics/summary.json`
+- Round 3 output root: `outputs/text_gs_alignment_refine_alpha_20260828`
