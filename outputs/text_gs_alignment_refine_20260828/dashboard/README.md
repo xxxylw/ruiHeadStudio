@@ -48,6 +48,11 @@ Baseline is the supplied HeadStudio table. CLIP and MUSIQ are higher-is-better; 
 | ViT-B/32 CLIP | 0.309419 | 0.313100 | -0.003681 | no |
 | PIQE | 65.032274 | 59.930000 | 5.102274 | no |
 | MUSIQ | 57.048752 | 51.360000 | 5.688752 | yes |
+| ViT-L/14 CLIP | 0.273263 | 0.278400 | -0.005137 | no |
+| ViT-B/16 CLIP | 0.320631 | 0.313000 | 0.007631 | yes |
+| ViT-B/32 CLIP | 0.313588 | 0.313100 | 0.000488 | yes |
+| PIQE | 64.224634 | 59.930000 | 4.294634 | no |
+| MUSIQ | 55.503357 | 51.360000 | 4.143357 | yes |
 
 ## refine_semantic
 
@@ -76,11 +81,12 @@ Baseline is the supplied HeadStudio table. CLIP and MUSIQ are higher-is-better; 
 
 ## Sources
 
-- `outputs/text_gs_alignment_20260827/foreground_view_clip/eval/all_metrics/summary.json`
 - `outputs/text_gs_alignment_20260827/global_clip_warm/eval/all_metrics/summary.json`
+- `outputs/text_gs_alignment_20260827/foreground_view_clip/eval/all_metrics/summary.json`
 - `outputs/text_gs_alignment_20260827/text_gs_multicomponent/eval/all_metrics/summary.json`
 - `outputs/text_gs_alignment_refine_20260828/refine_global/eval/all_metrics/summary.json`
 - `outputs/text_gs_alignment_refine_20260828/refine_multicomponent/eval/all_metrics/summary.json`
 - `outputs/text_gs_alignment_refine_20260828/refine_semantic/eval/all_metrics/summary.json`
 - `outputs/text_gs_alignment_refine_alpha_20260828/refine_global/eval/all_metrics/summary.json`
 - `outputs/text_gs_alignment_refine_alpha_20260828/refine_semantic/eval/all_metrics/summary.json`
+- `outputs/text_gs_alignment_refine_alpha_retry5_20260828/refine_multicomponent/eval/all_metrics/summary.json`

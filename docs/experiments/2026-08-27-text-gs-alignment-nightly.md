@@ -142,3 +142,16 @@ The proposed contribution is now implemented as differentiable multi-component t
 - Round 3 output root: `outputs/text_gs_alignment_refine_alpha_20260828`
 - Round 3 alpha metrics: `outputs/text_gs_alignment_refine_alpha_20260828/<tag>/eval/all_metrics/summary.json`
 - Current batch-1 retry: `outputs/text_gs_alignment_refine_alpha_retry5_20260828`
+
+## Round 3 Multi-Component Retry Results (2026-08-29)
+
+The fixed-prompt retry completed the full 3,000-step continuation from the round-2 multi-component PLY with `data.batch_size=1`. It used rasterized-alpha foreground crops and weights `global=0.20`, `foreground=0.55`, `view=0.25`, with `lambda_clip=0.006`. The exact prompt was read from `configs/headstudio_retry.yaml`. Evaluation was run per metric after the combined evaluator exceeded the available memory while loading MUSIQ; the five outputs were then merged with the repository confidence-interval summarizer.
+
+| Run | ViT-L/14 CLIP | ViT-B/16 CLIP | ViT-B/32 CLIP | PIQE | MUSIQ |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| HeadStudio baseline | 0.278400 | 0.313000 | 0.313100 | 59.930000 | 51.360000 |
+| `retry5_multicomponent_alpha` | 0.273263 | 0.320631 | 0.313588 | 64.224634 | 55.503357 |
+
+Relative to HeadStudio, this run improves ViT-B/16 by `+0.007631`, ViT-B/32 by `+0.000488`, and MUSIQ by `+4.143357`. ViT-L/14 is `-0.005137` below baseline and PIQE is `+4.294634` worse, so the full five-metric success gate remains open. The result supports the proposed component-aware text-GS alignment direction, but it also shows that stronger semantic alignment currently trades against the large CLIP model and no-reference perceptual quality. The next method iteration should introduce an explicit quality-preserving constraint or quality-aware late-stage loss schedule.
+
+The retry manifest and per-metric evidence are under `outputs/text_gs_alignment_refine_alpha_retry5_20260828/refine_multicomponent/`. The consolidated result is `eval/all_metrics/summary.json`; the comparison dashboard was regenerated at `outputs/text_gs_alignment_refine_20260828/dashboard/`.
