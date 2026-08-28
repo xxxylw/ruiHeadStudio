@@ -33,6 +33,11 @@ Baseline is the supplied HeadStudio table. CLIP and MUSIQ are higher-is-better; 
 | ViT-B/32 CLIP | 0.306624 | 0.313100 | -0.006476 | no |
 | PIQE | 64.574665 | 59.930000 | 4.644665 | no |
 | MUSIQ | 55.785665 | 51.360000 | 4.425665 | yes |
+| ViT-L/14 CLIP | 0.269375 | 0.278400 | -0.009025 | no |
+| ViT-B/16 CLIP | 0.313725 | 0.313000 | 0.000725 | yes |
+| ViT-B/32 CLIP | 0.315584 | 0.313100 | 0.002484 | yes |
+| PIQE | 62.266065 | 59.930000 | 2.336065 | no |
+| MUSIQ | 56.774312 | 51.360000 | 5.414312 | yes |
 
 ## refine_multicomponent
 
@@ -53,6 +58,11 @@ Baseline is the supplied HeadStudio table. CLIP and MUSIQ are higher-is-better; 
 | ViT-B/32 CLIP | 0.304467 | 0.313100 | -0.008633 | no |
 | PIQE | 64.750737 | 59.930000 | 4.820737 | no |
 | MUSIQ | 56.273251 | 51.360000 | 4.913251 | yes |
+| ViT-L/14 CLIP | 0.270986 | 0.278400 | -0.007414 | no |
+| ViT-B/16 CLIP | 0.315448 | 0.313000 | 0.002448 | yes |
+| ViT-B/32 CLIP | 0.315254 | 0.313100 | 0.002154 | yes |
+| PIQE | 61.285742 | 59.930000 | 1.355742 | no |
+| MUSIQ | 57.011313 | 51.360000 | 5.651313 | yes |
 
 ## text_gs_multicomponent
 
@@ -72,3 +82,5 @@ Baseline is the supplied HeadStudio table. CLIP and MUSIQ are higher-is-better; 
 - `outputs/text_gs_alignment_refine_20260828/refine_global/eval/all_metrics/summary.json`
 - `outputs/text_gs_alignment_refine_20260828/refine_multicomponent/eval/all_metrics/summary.json`
 - `outputs/text_gs_alignment_refine_20260828/refine_semantic/eval/all_metrics/summary.json`
+- `outputs/text_gs_alignment_refine_alpha_20260828/refine_global/eval/all_metrics/summary.json`
+- `outputs/text_gs_alignment_refine_alpha_20260828/refine_semantic/eval/all_metrics/summary.json`

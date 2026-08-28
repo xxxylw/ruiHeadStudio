@@ -29,3 +29,13 @@ refine_semantic,ViT-B/16 CLIP,0.312228,0.313000,-0.000772,no
 refine_semantic,ViT-B/32 CLIP,0.304467,0.313100,-0.008633,no
 refine_semantic,PIQE,64.750737,59.930000,4.820737,no
 refine_semantic,MUSIQ,56.273251,51.360000,4.913251,yes
+refine_global,ViT-L/14 CLIP,0.269375,0.278400,-0.009025,no
+refine_global,ViT-B/16 CLIP,0.313725,0.313000,0.000725,yes
+refine_global,ViT-B/32 CLIP,0.315584,0.313100,0.002484,yes
+refine_global,PIQE,62.266065,59.930000,2.336065,no
+refine_global,MUSIQ,56.774312,51.360000,5.414312,yes
+refine_semantic,ViT-L/14 CLIP,0.270986,0.278400,-0.007414,no
+refine_semantic,ViT-B/16 CLIP,0.315448,0.313000,0.002448,yes
+refine_semantic,ViT-B/32 CLIP,0.315254,0.313100,0.002154,yes
+refine_semantic,PIQE,61.285742,59.930000,1.355742,no
+refine_semantic,MUSIQ,57.011313,51.360000,5.651313,yes

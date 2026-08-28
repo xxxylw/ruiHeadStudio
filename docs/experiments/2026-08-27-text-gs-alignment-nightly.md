@@ -114,6 +114,22 @@ During round 2, foreground alignment still used legacy depth-normalized opacity 
 
 Run the same 3,000-step continuation launcher from `refine_multicomponent/runs/refine_multicomponent/save/last.ply` with the committed rasterized-alpha foreground correction active. Preserve the exact prompt, four-view evaluation protocol, and three-way ablation in a separate output root.
 
+## Round 3 Results (2026-08-28)
+
+The alpha-corrected `refine_global` and `refine_semantic` runs completed 3,000 steps and were evaluated on the same four views. Both now exceed the two smaller CLIP gates and substantially improve MUSIQ, but neither reaches the ViT-L/14 or PIQE gate.
+
+| Run | ViT-L/14 CLIP | ViT-B/16 CLIP | ViT-B/32 CLIP | PIQE | MUSIQ |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| HeadStudio baseline | 0.278400 | 0.313000 | 0.313100 | 59.930000 | 51.360000 |
+| `refine_global` alpha | 0.269375 | 0.313725 | 0.315584 | 62.266065 | 56.774312 |
+| `refine_semantic` alpha | 0.270986 | 0.315448 | 0.315254 | 61.285742 | 57.011314 |
+
+The strongest current trade-off is `refine_semantic` alpha: ViT-B/16 improves by `+0.002448`, ViT-B/32 by `+0.002154`, and MUSIQ by `+5.651314`. The multi-component alpha branch first failed on an incorrect batch shape, then exposed a 24GB GPU memory limit when using batch 4. Its reproducible batch-1 retry is running from the same checkpoint with the exact prompt in `configs/headstudio_retry.yaml`.
+
+## Current Status and Next Decision
+
+The proposed contribution is now implemented as differentiable multi-component text-GS alignment with rasterized-alpha foreground crops and view-conditioned prompts. The current evidence is promising but does not yet satisfy the full success gate because ViT-L/14 remains below `0.2784` and PIQE remains above `59.93`. After the batch-1 multi-component result, the next focused experiment should reduce the CLIP loss after a quality checkpoint or add a no-reference quality constraint, rather than increasing CLIP weight blindly.
+
 ## Artifacts
 
 - Training logs: `outputs/text_gs_alignment_20260827/<tag>/<tag>.train.log`
@@ -124,3 +140,5 @@ Run the same 3,000-step continuation launcher from `refine_multicomponent/runs/r
 - SVG: `outputs/text_gs_alignment_20260827/dashboard/metrics_bars.svg`
 - Round 2 metrics: `outputs/text_gs_alignment_refine_20260828/<tag>/eval/all_metrics/summary.json`
 - Round 3 output root: `outputs/text_gs_alignment_refine_alpha_20260828`
+- Round 3 alpha metrics: `outputs/text_gs_alignment_refine_alpha_20260828/<tag>/eval/all_metrics/summary.json`
+- Current batch-1 retry: `outputs/text_gs_alignment_refine_alpha_retry5_20260828`
