@@ -78,6 +78,23 @@ Primary success means improving ViT-L/14 CLIP over `0.2784`. A stronger result s
 
 The most paper-useful result is not only the best score, but an ablation pattern where the multi-component objective improves semantic metrics without destroying no-reference perceptual quality.
 
+## Round 1 Results (2026-08-28)
+
+All three runs completed 10,000 training steps on GPUs 0, 1, and 2. Evaluation used the repository's offline CLIP, PIQE, and MUSIQ implementations on the four final views. The evaluator initially rejected the generated TSV header; `evaluation/src/dataset.py` now explicitly skips the standard header while continuing to validate every data row.
+
+| Run | ViT-L/14 CLIP | ViT-B/16 CLIP | ViT-B/32 CLIP | PIQE | MUSIQ |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| HeadStudio baseline | 0.278400 | 0.313000 | 0.313100 | 59.930000 | 51.360000 |
+| `global_clip_warm` | 0.270631 | 0.302638 | 0.293552 | 69.448099 | 55.540452 |
+| `foreground_view_clip` | 0.277507 | 0.307239 | 0.298511 | 68.591249 | 54.452843 |
+| `text_gs_multicomponent` | 0.271995 | 0.300687 | 0.301576 | 67.922038 | 55.929020 |
+
+Round 1 improves MUSIQ for every variant, with `text_gs_multicomponent` giving the best MUSIQ (+4.569020). It does not yet pass the primary CLIP or PIQE gates. The likely cause is that the CLIP objective is active only during the last 1,500--2,500 steps, after the SDS geometry and appearance have mostly converged. This motivates the continuation/refinement round below rather than treating the first round as a final result.
+
+## Round 2 Plan
+
+Continue from the best Round 1 Gaussian state (`text_gs_multicomponent/runs/text_gs_multicomponent/save/last.ply`) for 3,000 steps with `gaussian_init_step=7000`, so the final checkpoint remains named `it10000`. The alignment loss will be active throughout the continuation, with foreground and view-conditioned components receiving more weight. This tests whether semantic alignment needs a longer, low-amplitude refinement window instead of a late pulse.
+
 ## Artifacts
 
 - Training logs: `outputs/text_gs_alignment_20260827/<tag>/<tag>.train.log`

@@ -30,6 +30,8 @@ def load_examples(batch_root: Path) -> list[Example]:
         manifest_path.read_text(encoding="utf-8").splitlines(), start=1
     ):
         columns = line.split("\t")
+        if line_number == 1 and columns[:3] == ["index", "tag", "status"]:
+            continue
         if len(columns) < 8:
             raise DatasetValidationError(
                 f"manifest line {line_number} has fewer than 8 tab-separated columns"
