@@ -165,6 +165,7 @@ class Head3DGSLKsRig(BaseLift3DSystem):
 
         images = []
         depths = []
+        opacities = []
         self.viewspace_point_list = []
 
         if self.cfg.training_w_animation:
@@ -192,6 +193,13 @@ class Head3DGSLKsRig(BaseLift3DSystem):
 
             depth = render_pkg["depth_3dgs"]
 
+            alpha = render_pkg.get("alpha_3dgs")
+            if alpha is not None:
+                opacity = alpha.permute(1, 2, 0)
+            else:
+                opacity = depth / (depth.max() + 1e-5)
+            opacities.append(opacity)
+
             depth = depth.permute(1, 2, 0)
             image = image.permute(1, 2, 0)
             images.append(image)
@@ -199,6 +207,7 @@ class Head3DGSLKsRig(BaseLift3DSystem):
 
         images = torch.stack(images, 0)
         depths = torch.stack(depths, 0)
+        opacities = torch.stack(opacities, 0)
         # depth_min = torch.amin(depths, dim=[1, 2, 3], keepdim=True)
         # depth_max = torch.amax(depths, dim=[1, 2, 3], keepdim=True)
         # depths = (depths - depth_min) / (depth_max - depth_min + 1e-10)
@@ -208,11 +217,7 @@ class Head3DGSLKsRig(BaseLift3DSystem):
 
         render_pkg["comp_rgb"] = images
         render_pkg["depth"] = depths
-        alpha = render_pkg.get("alpha_3dgs")
-        if alpha is not None:
-            render_pkg["opacity"] = alpha.permute(1, 2, 0)
-        else:
-            render_pkg["opacity"] = depths / (depths.max() + 1e-5)
+        render_pkg["opacity"] = opacities
 
         return {
             **render_pkg,
