@@ -233,3 +233,18 @@ To test whether the final continuation step was over-optimized, the `frequency_q
 | `it12000` | 0.271067 | **0.319440** | **0.315881** | 61.998288 | 56.573508 |
 
 The intermediate checkpoint lowers PIQE by `1.399603` relative to the final checkpoint, but it also loses the B/32 and B/16 gains recovered by step 12,000. No checkpoint passes the full gate, so checkpoint selection is useful as a reporting/Pareto tool but is not sufficient as the main method. The visual comparison is under `outputs/text_gs_alignment_frequency_quality_sweep_20260830/checkpoint_selection_dashboard/`.
+
+## Global CLIP Recovery Sweep Results (2026-08-30)
+
+To test whether foreground and view-conditioned text components were responsible for the ViT-L/14 regression, three 2,000-step continuations started from the `frequency_q0005` checkpoint at global step 12,000. The frequency gate remained active with weight `0.0005`; CLIP used `lambda_clip=0.0005` or `0.0010`, and the component weights were either global-only or `0.50/0.30/0.20` for global/foreground/view.
+
+| Run | lambda_clip | Global/Foreground/View | ViT-L/14 CLIP | ViT-B/16 CLIP | ViT-B/32 CLIP | PIQE | MUSIQ |
+| --- | ---: | --- | ---: | ---: | ---: | ---: | ---: |
+| HeadStudio baseline | - | - | 0.278400 | 0.313000 | 0.313100 | 59.930000 | 51.360000 |
+| `global_l0005` | 0.0005 | 1.00/0.00/0.00 | 0.268430 | 0.321448 | 0.313147 | 62.517246 | 55.880399 |
+| `global_l0010` | 0.0010 | 1.00/0.00/0.00 | 0.273201 | 0.321723 | **0.319443** | 62.947541 | **56.298323** |
+| `mixed_l0010` | 0.0010 | 0.50/0.30/0.20 | 0.274077 | **0.322018** | 0.315927 | **62.359344** | 55.395778 |
+
+The global-only variants improve B/16, while `global_l0010` improves B/32 and MUSIQ; `mixed_l0010` gives the best B/16 and PIQE in this sweep. ViT-L/14 remains below the baseline for every variant, showing that removing foreground/view terms does not recover the large-model score. The full five-metric gate therefore remains open. The evaluator race was fixed operationally by rerunning after all `last.ply` files existed; no training was repeated.
+
+Artifacts: `outputs/text_gs_alignment_global_recovery_sweep_20260830/dashboard/`, `scripts/launch_global_recovery_sweep.sh`, and `scripts/evaluate_global_recovery_sweep.sh`.
