@@ -128,6 +128,12 @@ def test_training_writes_gradient_probe_provenance():
     assert "grad_is_none" in source
 
 
+def test_optimizer_step_sanitizes_non_finite_gradients():
+    source = (ROOT / "threestudio/systems/Head3DGSLKs.py").read_text(encoding="utf-8")
+
+    assert "tensor.grad.nan_to_num_(nan=0.0, posinf=0.0, neginf=0.0)" in source
+
+
 def test_clip_decay_weight_has_stable_linear_window():
     assert clip_decay_weight(0.006, 7000, 7000, 8000) == pytest.approx(0.006)
     assert clip_decay_weight(0.006, 7500, 7000, 8000) == pytest.approx(0.003)

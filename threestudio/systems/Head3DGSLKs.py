@@ -697,6 +697,10 @@ class Head3DGSLKsRig(BaseLift3DSystem):
         # return
 
         with torch.no_grad():
+            for parameter_group in optimizer.param_groups:
+                for tensor in parameter_group["params"]:
+                    if tensor.grad is not None:
+                        tensor.grad.nan_to_num_(nan=0.0, posinf=0.0, neginf=0.0)
 
             if self.true_global_step < self.cfg.densify_prune_end_step:  # 15000
                 viewspace_point_tensor_grad = torch.zeros_like(self.viewspace_point_list[0])
@@ -740,6 +744,7 @@ class Head3DGSLKsRig(BaseLift3DSystem):
                 ("features_dc", self.gaussian._features_dc),
                 ("opacity", self.gaussian._opacity),
                 ("scaling", self.gaussian._scaling),
+                ("shape", self.gaussian._shape),
             ):
                 values[name] = {
                     "requires_grad": bool(parameter.requires_grad),
