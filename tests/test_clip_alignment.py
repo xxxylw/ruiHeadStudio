@@ -16,6 +16,7 @@ clip_decay_weight = _CLIP_ALIGNMENT.clip_decay_weight
 normalized_parameter_drift = _CLIP_ALIGNMENT.normalized_parameter_drift
 frequency_quality_loss = _CLIP_ALIGNMENT.frequency_quality_loss
 quality_ramp_weight = _CLIP_ALIGNMENT.quality_ramp_weight
+rendered_reference_loss = _CLIP_ALIGNMENT.rendered_reference_loss
 
 
 def test_clip_alignment_has_warmup_and_cosine_distance_contract():
@@ -78,6 +79,9 @@ def test_headstudio_only_loads_clip_when_its_loss_is_enabled():
     assert "quality_start_step: int = 0" in system_source
     assert "quality_ramp_end_step: int = 0" in system_source
     assert "lambda_frequency_quality: float = 0.0" in system_source
+    assert "lambda_rendered_reference: float = 0.0" in system_source
+    assert "self.reference_gaussian = None" in system_source
+    assert "track_stats=False" in system_source
     assert "lambda_clip: 0.0" in config_source
 
 
@@ -131,3 +135,25 @@ def test_quality_ramp_weight_has_stable_linear_window():
     assert quality_ramp_weight(0.002, 11500, 11000, 12000) == pytest.approx(0.001)
     assert quality_ramp_weight(0.002, 12000, 11000, 12000) == pytest.approx(0.002)
     assert quality_ramp_weight(0.002, 13000, 11000, 12000) == pytest.approx(0.002)
+
+
+def test_rendered_reference_loss_is_zero_for_identical_images():
+    image = torch.rand((1, 3, 8, 8), requires_grad=True)
+    loss = rendered_reference_loss(image, image.detach())
+    assert torch.isclose(loss, torch.zeros_like(loss))
+
+
+def test_rendered_reference_loss_has_finite_gradients_and_alpha_support():
+    image = torch.rand((1, 3, 8, 8), requires_grad=True)
+    reference = torch.zeros_like(image)
+    alpha = torch.zeros((1, 8, 8, 1))
+    alpha[:, 2:6, 2:6] = 1.0
+    loss = rendered_reference_loss(image, reference, alpha)
+    loss.backward()
+    assert torch.isfinite(loss)
+    assert torch.isfinite(image.grad).all()
+
+
+def test_rendered_reference_loss_rejects_shape_mismatch():
+    with pytest.raises(ValueError, match="same shape"):
+        rendered_reference_loss(torch.zeros((1, 3, 8, 8)), torch.zeros((1, 3, 7, 8)))

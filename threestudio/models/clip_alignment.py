@@ -155,6 +155,50 @@ def frequency_quality_loss(
     return 0.5 * (full + half)
 
 
+def rendered_reference_loss(
+    images: torch.Tensor,
+    references: torch.Tensor,
+    opacity: Optional[torch.Tensor] = None,
+) -> torch.Tensor:
+    """Keep a rendered image close to a detached teacher view and its edges."""
+    if images.ndim != 4 or images.shape[1] != 3:
+        raise ValueError("images must have shape [B,3,H,W]")
+    if references.shape != images.shape:
+        raise ValueError("images and references must have the same shape")
+    if images.shape[-2] < 2 or images.shape[-1] < 2:
+        raise ValueError("images must be at least 2x2")
+
+    weight = torch.ones(
+        (images.shape[0], 1, images.shape[-2], images.shape[-1]),
+        dtype=images.dtype,
+        device=images.device,
+    )
+    if opacity is not None:
+        if opacity.ndim == 4 and opacity.shape[-1] == 1:
+            opacity = opacity.permute(0, 3, 1, 2)
+        elif opacity.ndim == 4 and opacity.shape[1] == 1:
+            pass
+        elif opacity.ndim == 3:
+            opacity = opacity.unsqueeze(1)
+        else:
+            raise ValueError("opacity must be [B,H,W] or [B,1,H,W]")
+        if opacity.shape[0] != images.shape[0] or opacity.shape[-2:] != images.shape[-2:]:
+            raise ValueError("images and opacity must share batch and spatial dimensions")
+        weight = 0.25 + 0.75 * opacity.detach().to(dtype=images.dtype)
+
+    reference = references.detach()
+    difference = images - reference
+    color = (torch.sqrt(difference.square() + 1.0e-6) - 1.0e-3)
+    color = (color * weight).mean() / weight.mean().clamp_min(1.0e-6)
+    current_dx = images[..., :, 1:] - images[..., :, :-1]
+    reference_dx = reference[..., :, 1:] - reference[..., :, :-1]
+    current_dy = images[..., 1:, :] - images[..., :-1, :]
+    reference_dy = reference[..., 1:, :] - reference[..., :-1, :]
+    edge_x = (current_dx - reference_dx).abs().mean()
+    edge_y = (current_dy - reference_dy).abs().mean()
+    return 0.7 * color + 0.3 * (edge_x + edge_y)
+
+
 class CLIPAlignment:
     """Frozen CLIP image encoder with a differentiable image preprocessing path."""
 

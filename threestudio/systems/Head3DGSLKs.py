@@ -1,3 +1,4 @@
+import copy
 import io
 import math
 import numpy as np
@@ -20,6 +21,7 @@ from threestudio.models.clip_alignment import (
     frequency_quality_loss,
     normalized_parameter_drift,
     quality_ramp_weight,
+    rendered_reference_loss,
 )
 
 from gaussiansplatting.gaussian_renderer import render
@@ -82,6 +84,7 @@ class Head3DGSLKsRig(BaseLift3DSystem):
         quality_start_step: int = 0
         quality_ramp_end_step: int = 0
         lambda_frequency_quality: float = 0.0
+        lambda_rendered_reference: float = 0.0
         use_eye_pose: bool = False
         use_neck_pose: bool = False
 
@@ -166,16 +169,25 @@ class Head3DGSLKsRig(BaseLift3DSystem):
         c2w[:, 3, 3] = 1.0
         return c2w
 
-    def set_pose(self, expression, jaw_pose, leye_pose, reye_pose, neck_pose=None):
-        self.gaussian._expression = expression.detach()
-        self.gaussian._jaw_pose = jaw_pose.detach()
+    def set_pose(self, expression, jaw_pose, leye_pose, reye_pose, neck_pose=None, gaussian_model=None):
+        gaussian_model = self.gaussian if gaussian_model is None else gaussian_model
+        gaussian_model._expression = expression.detach()
+        gaussian_model._jaw_pose = jaw_pose.detach()
         if self.cfg.use_eye_pose:
-            self.gaussian._leye_pose = leye_pose.detach()
-            self.gaussian._reye_pose = reye_pose.detach()
+            gaussian_model._leye_pose = leye_pose.detach()
+            gaussian_model._reye_pose = reye_pose.detach()
         if self.cfg.use_neck_pose and neck_pose is not None:
-            self.gaussian._neck_pose = neck_pose.detach()
+            gaussian_model._neck_pose = neck_pose.detach()
 
-    def forward(self, batch: Dict[str, Any], renderbackground=None) -> Dict[str, Any]:
+    def forward(
+        self,
+        batch: Dict[str, Any],
+        renderbackground=None,
+        gaussian_model=None,
+        track_stats=True,
+    ) -> Dict[str, Any]:
+
+        gaussian_model = self.gaussian if gaussian_model is None else gaussian_model
 
         if renderbackground is None:
             renderbackground = self.background_tensor
@@ -183,7 +195,8 @@ class Head3DGSLKsRig(BaseLift3DSystem):
         images = []
         depths = []
         opacities = []
-        self.viewspace_point_list = []
+        if track_stats:
+            self.viewspace_point_list = []
 
         if self.cfg.training_w_animation:
             self.set_pose(
@@ -192,21 +205,24 @@ class Head3DGSLKsRig(BaseLift3DSystem):
                 batch['leye_pose'],
                 batch['reye_pose'],
                 batch.get('neck_pose', None),
+                gaussian_model=gaussian_model,
             )
 
         for id in range(batch['c2w'].shape[0]):
             viewpoint_cam = Camera(c2w=batch['c2w'][id], FoVy=batch['fovy'][id], height=batch['height'],
                                    width=batch['width'])
 
-            render_pkg = render(viewpoint_cam, self.gaussian, self.pipe, renderbackground)
+            render_pkg = render(viewpoint_cam, gaussian_model, self.pipe, renderbackground)
             image, viewspace_point_tensor, radii = render_pkg["render"], render_pkg["viewspace_points"], render_pkg[
                 "radii"]
-            self.viewspace_point_list.append(viewspace_point_tensor)
+            if track_stats:
+                self.viewspace_point_list.append(viewspace_point_tensor)
 
-            if id == 0:
-                self.radii = radii
-            else:
-                self.radii = torch.max(radii, self.radii)
+            if track_stats:
+                if id == 0:
+                    self.radii = radii
+                else:
+                    self.radii = torch.max(radii, self.radii)
 
             depth = render_pkg["depth_3dgs"]
 
@@ -230,7 +246,8 @@ class Head3DGSLKsRig(BaseLift3DSystem):
         # depths = (depths - depth_min) / (depth_max - depth_min + 1e-10)
         # depths = depths.repeat(1, 1, 1, 3)
 
-        self.visibility_filter = self.radii > 0.0
+        if track_stats:
+            self.visibility_filter = self.radii > 0.0
 
         render_pkg["comp_rgb"] = images
         render_pkg["depth"] = depths
@@ -435,6 +452,30 @@ class Head3DGSLKsRig(BaseLift3DSystem):
             )
             loss = loss + loss_frequency_quality * quality_weight
         self.log("train/loss_frequency_quality", loss_frequency_quality)
+
+        reference_weight = quality_ramp_weight(
+            self.C(self.cfg.lambda_rendered_reference),
+            self.true_global_step,
+            self.cfg.quality_start_step,
+            self.cfg.quality_ramp_end_step,
+        )
+        loss_rendered_reference = torch.zeros((), device=images.device)
+        if reference_weight > 0.0:
+            if self.reference_gaussian is None:
+                raise RuntimeError("rendered reference loss is enabled without a reference Gaussian")
+            with torch.no_grad():
+                reference_out = self(
+                    batch,
+                    gaussian_model=self.reference_gaussian,
+                    track_stats=False,
+                )
+            loss_rendered_reference = rendered_reference_loss(
+                images.permute(0, 3, 1, 2),
+                reference_out["comp_rgb"].permute(0, 3, 1, 2),
+                out["opacity"],
+            )
+            loss = loss + loss_rendered_reference * reference_weight
+        self.log("train/loss_rendered_reference", loss_rendered_reference)
 
         loss_trust_xyz = torch.zeros((), device=images.device)
         loss_trust_scaling = torch.zeros((), device=images.device)
@@ -791,6 +832,12 @@ class Head3DGSLKsRig(BaseLift3DSystem):
             threestudio.info(f"Initializing Gaussian state from PLY: {self.cfg.gaussian_init_ply}")
             self.gaussian.load_ply(self.cfg.gaussian_init_ply)
         self.gaussian.training_setup(opt)
+        self.reference_gaussian = None
+        if self.C(self.cfg.lambda_rendered_reference) > 0.0:
+            self.reference_gaussian = copy.deepcopy(self.gaussian)
+            self.reference_gaussian.model.eval()
+            for parameter in self.reference_gaussian.model.parameters():
+                parameter.requires_grad_(False)
         self.trust_region_anchor = None
         if self.C(self.cfg.lambda_trust) > 0.0:
             self.trust_region_anchor = {
