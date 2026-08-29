@@ -248,3 +248,18 @@ To test whether foreground and view-conditioned text components were responsible
 The global-only variants improve B/16, while `global_l0010` improves B/32 and MUSIQ; `mixed_l0010` gives the best B/16 and PIQE in this sweep. ViT-L/14 remains below the baseline for every variant, showing that removing foreground/view terms does not recover the large-model score. The full five-metric gate therefore remains open. The evaluator race was fixed operationally by rerunning after all `last.ply` files existed; no training was repeated.
 
 Artifacts: `outputs/text_gs_alignment_global_recovery_sweep_20260830/dashboard/`, `scripts/launch_global_recovery_sweep.sh`, and `scripts/evaluate_global_recovery_sweep.sh`.
+
+## Prompt Factorization Sweep Results (2026-08-30)
+
+The next experiment factorized the training text to test whether long style descriptors dilute identity alignment. All three runs continued for 2,000 steps from `mixed_l0010`, retained the frequency quality gate at `0.0005`, used CLIP component weights `global=0.50`, `foreground=0.30`, `view=0.20`, and were evaluated against the original full prompt.
+
+| Run | Training prompt | ViT-L/14 CLIP | ViT-B/16 CLIP | ViT-B/32 CLIP | PIQE | MUSIQ |
+| --- | --- | ---: | ---: | ---: | ---: | ---: |
+| HeadStudio baseline | - | 0.278400 | 0.313000 | 0.313100 | 59.930000 | 51.360000 |
+| `identity` | `a portrait of Elon Musk` | **0.285566** | 0.327941 | **0.322520** | 65.748740 | **56.947380** |
+| `content` | `a DSLR portrait of Elon Musk` | **0.289189** | **0.343709** | **0.316544** | 62.903001 | 55.577168 |
+| `full` | original full prompt | 0.276166 | 0.324031 | 0.313305 | **61.410410** | 56.379683 |
+
+Prompt factorization is the strongest semantic result so far: both short prompts exceed ViT-L/14, B/16, and B/32 baselines, and `identity` also exceeds MUSIQ. The `content` prompt reaches the best B/16 score (`+0.030709`), while the full prompt remains below the ViT-L/14 gate. Quality is still the bottleneck: the best PIQE is `61.410410`, which is `+1.480410` above baseline. This supports separating identity content from style during alignment, followed by a stronger rendered-image quality phase.
+
+Artifacts: `outputs/text_gs_alignment_prompt_factorization_sweep_20260830/dashboard/`, `scripts/launch_prompt_factorization_sweep.sh`, and `scripts/evaluate_prompt_factorization_sweep.sh`.
