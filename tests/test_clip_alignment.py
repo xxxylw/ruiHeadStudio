@@ -114,6 +114,13 @@ def test_gaussian_ply_reload_resets_pointwise_optimizer_buffers():
     assert "self.max_radii2D = torch.zeros((self.num_gs), device=\"cuda\")" in load_source
 
 
+def test_training_writes_parameter_drift_provenance():
+    source = (ROOT / "threestudio/systems/Head3DGSLKs.py").read_text(encoding="utf-8")
+
+    assert "parameter_drift.json" in source
+    assert "max_abs_xyz_drift" in source
+
+
 def test_clip_decay_weight_has_stable_linear_window():
     assert clip_decay_weight(0.006, 7000, 7000, 8000) == pytest.approx(0.006)
     assert clip_decay_weight(0.006, 7500, 7000, 8000) == pytest.approx(0.003)

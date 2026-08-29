@@ -1,5 +1,6 @@
 import copy
 import io
+import json
 import math
 import numpy as np
 from plyfile import PlyData, PlyElement
@@ -895,6 +896,7 @@ class Head3DGSLKsRig(BaseLift3DSystem):
         if self.cfg.gaussian_init_ply is not None:
             threestudio.info(f"Initializing Gaussian state from PLY: {self.cfg.gaussian_init_ply}")
             self.gaussian.load_ply(self.cfg.gaussian_init_ply)
+        self._initial_gaussian_xyz = self.gaussian._xyz.detach().clone()
         self.gaussian.training_setup(opt)
         self.reference_gaussian = None
         if self.C(self.cfg.lambda_rendered_reference) > 0.0 or self.C(self.cfg.lambda_reference_statistics) > 0.0:
@@ -916,6 +918,21 @@ class Head3DGSLKsRig(BaseLift3DSystem):
         }
 
         return ret
+
+    def on_train_end(self) -> None:
+        if hasattr(self, "_initial_gaussian_xyz"):
+            drift = (self.gaussian._xyz.detach() - self._initial_gaussian_xyz).abs()
+            with open(self.get_save_path("parameter_drift.json"), "w") as handle:
+                json.dump(
+                    {
+                        "initial_point_count": int(self._initial_gaussian_xyz.shape[0]),
+                        "final_point_count": int(self.gaussian._xyz.shape[0]),
+                        "max_abs_xyz_drift": float(drift.max().item()),
+                        "mean_abs_xyz_drift": float(drift.mean().item()),
+                    },
+                    handle,
+                    indent=2,
+                )
 
     def guidance_evaluation_save(self, comp_rgb, guidance_eval_out):
         B, size = comp_rgb.shape[:2]
