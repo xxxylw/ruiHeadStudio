@@ -2,7 +2,7 @@
 set -euo pipefail
 
 ROOT=/home/huangqirui/Projects/ruiHeadStudio
-RUN_ROOT="$ROOT/outputs/text_gs_b32_stats_valid_sweep_v7_20260830"
+RUN_ROOT="$ROOT/outputs/text_gs_b32_stats_valid_sweep_v8_20260830"
 BASE_ROOT="$ROOT/outputs/text_gs_b32_recovery_fast_sweep_20260830"
 PROMPT='a DSLR portrait of Elon Musk'
 set +u
