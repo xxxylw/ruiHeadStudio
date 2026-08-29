@@ -221,3 +221,15 @@ The frequency quality gate was added as a differentiable rendered-image regulari
 `frequency_q0005` is the best quality-preserving variant in this sweep: it has the lowest PIQE at `61.998288`, although that is still `+2.068288` above the HeadStudio baseline. `frequency_q0020` gives the strongest B/16 result at `0.320800`. Across this sweep, the best run improves B/16 by `+0.006440`, B/32 by `+0.002781`, and MUSIQ by `+5.213508`, but PIQE remains above baseline and ViT-L/14 remains below `0.2784`; therefore the full five-metric gate remains open.
 
 The helper and schedule tests pass (`10 passed`). The evaluator now reads `HEADSTUDIO_FINAL_STEP=12000`, so reruns use the actual continuation endpoint without filename aliases. Scripts are `scripts/launch_frequency_quality_sweep.sh` and `scripts/evaluate_frequency_quality_sweep.sh`. The consolidated visual artifacts are under `outputs/text_gs_alignment_frequency_quality_sweep_20260830/dashboard/`.
+
+## Checkpoint Selection Probe (2026-08-30)
+
+To test whether the final continuation step was over-optimized, the `frequency_q0005` trajectory was evaluated at steps 11,000, 11,500, and 12,000 using the same four-view protocol.
+
+| Checkpoint | ViT-L/14 CLIP | ViT-B/16 CLIP | ViT-B/32 CLIP | PIQE | MUSIQ |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| `it11000` | 0.266876 | 0.312086 | 0.306772 | 61.366190 | 56.876076 |
+| `it11500` | 0.267341 | 0.318798 | 0.312202 | **60.598685** | 56.230666 |
+| `it12000` | 0.271067 | **0.319440** | **0.315881** | 61.998288 | 56.573508 |
+
+The intermediate checkpoint lowers PIQE by `1.399603` relative to the final checkpoint, but it also loses the B/32 and B/16 gains recovered by step 12,000. No checkpoint passes the full gate, so checkpoint selection is useful as a reporting/Pareto tool but is not sufficient as the main method. The visual comparison is under `outputs/text_gs_alignment_frequency_quality_sweep_20260830/checkpoint_selection_dashboard/`.
