@@ -206,3 +206,18 @@ Three batch-1 continuation runs started from the strongest prior semantic checkp
 `semantic_l0003` is the best B/16 and MUSIQ trade-off, improving them by `+0.006354` and `+5.123161`. `semantic_l0010` gives the best PIQE in this sweep, but it is still `+1.932961` above the baseline. None of the three passes the full five-metric gate. The experiment confirms that late low-weight semantic refinement can preserve the prior checkpoint better than a stronger continuation, but image quality remains the limiting factor.
 
 The evaluator initially assumed filenames at fixed step 10,000 while these continuation runs saved final views at step 12,000. The evaluation manifests were corrected with aliases pointing to the actual `it12000-*` images; no image content was changed. Final summaries are under `outputs/text_gs_alignment_semantic_quality_sweep_20260830/<tag>/eval/all_metrics/summary.json`, with the consolidated dashboard under `outputs/text_gs_alignment_semantic_quality_sweep_20260830/dashboard/`.
+
+## Frequency-Gated Rendered Quality Sweep Results (2026-08-30)
+
+The frequency quality gate was added as a differentiable rendered-image regularizer. It combines normalized total variation and Laplacian energy at full and half resolution, weighted by a detached alpha floor of `0.25`. The loss ramps from global step 11,000 to 12,000 while the component-aware CLIP weight decays over the same window. All runs continued from the strongest semantic checkpoint for 2,000 steps with batch size 1, `lambda_clip=0.001`, and component weights `global=0.20`, `foreground=0.55`, `view=0.25`.
+
+| Run | lambda_frequency_quality | ViT-L/14 CLIP | ViT-B/16 CLIP | ViT-B/32 CLIP | PIQE | MUSIQ |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| HeadStudio baseline | - | 0.278400 | 0.313000 | 0.313100 | 59.930000 | 51.360000 |
+| `frequency_q0005` | 0.0005 | 0.271067 | 0.319440 | **0.315881** | **61.998288** | **56.573508** |
+| `frequency_q0010` | 0.0010 | 0.270004 | 0.318233 | 0.299741 | 63.901771 | 56.444856 |
+| `frequency_q0020` | 0.0020 | 0.274647 | **0.320800** | 0.315701 | 62.982658 | 56.450035 |
+
+`frequency_q0005` is the best quality-preserving variant in this sweep: it has the lowest PIQE at `61.998288`, although that is still `+2.068288` above the HeadStudio baseline. `frequency_q0020` gives the strongest B/16 result at `0.320800`. Across this sweep, the best run improves B/16 by `+0.006440`, B/32 by `+0.002781`, and MUSIQ by `+5.213508`, but PIQE remains above baseline and ViT-L/14 remains below `0.2784`; therefore the full five-metric gate remains open.
+
+The helper and schedule tests pass (`10 passed`). The evaluator now reads `HEADSTUDIO_FINAL_STEP=12000`, so reruns use the actual continuation endpoint without filename aliases. Scripts are `scripts/launch_frequency_quality_sweep.sh` and `scripts/evaluate_frequency_quality_sweep.sh`. The consolidated visual artifacts are under `outputs/text_gs_alignment_frequency_quality_sweep_20260830/dashboard/`.
