@@ -93,6 +93,13 @@ system:
   clip_global_weight: 0.0
   clip_foreground_weight: 0.0
   clip_view_weight: 0.0
+  clip_decay_start_step: 0
+  clip_decay_end_step: 0
+  lambda_trust: 0.0
+  trust_xyz_weight: 1.0
+  trust_scaling_weight: 1.0
+  trust_opacity_weight: 1.0
+  trust_feature_weight: 0.25
   use_eye_pose: False
   use_neck_pose: False
 

@@ -11,6 +11,40 @@ def clip_alignment_weight(base_weight: float, global_step: int, start_step: int)
     return 0.0 if global_step < start_step else base_weight
 
 
+def clip_decay_weight(
+    base_weight: float,
+    global_step: int,
+    decay_start_step: int,
+    decay_end_step: int,
+) -> float:
+    """Linearly decay an active CLIP weight over a late refinement window."""
+    if base_weight <= 0.0 or decay_end_step <= decay_start_step:
+        return max(0.0, base_weight)
+    if global_step <= decay_start_step:
+        return base_weight
+    if global_step >= decay_end_step:
+        return 0.0
+    progress = (global_step - decay_start_step) / float(decay_end_step - decay_start_step)
+    return base_weight * (1.0 - progress)
+
+
+def normalized_parameter_drift(
+    current: torch.Tensor,
+    anchor: torch.Tensor,
+    normalizer: Optional[torch.Tensor] = None,
+    epsilon: float = 1.0e-6,
+) -> torch.Tensor:
+    """Measure mean absolute drift while keeping the anchor outside autograd."""
+    if current.shape != anchor.shape:
+        raise ValueError("current and anchor must have the same shape")
+    if normalizer is None:
+        normalizer = torch.ones_like(anchor)
+    if normalizer.shape != current.shape:
+        raise ValueError("normalizer must have the same shape as current")
+    scale = normalizer.detach().abs().clamp_min(epsilon)
+    return ((current - anchor.detach()).abs() / scale).mean()
+
+
 def cosine_alignment_loss(image_features: torch.Tensor, text_features: torch.Tensor) -> torch.Tensor:
     """Return mean cosine distance between normalized image and text features."""
     if text_features.ndim == 1:

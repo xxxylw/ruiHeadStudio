@@ -1,8 +1,19 @@
 from pathlib import Path
+import importlib.util
 
+import pytest
+import torch
 
 ROOT = Path(__file__).resolve().parents[1]
 
+_MODULE_SPEC = importlib.util.spec_from_file_location(
+    "clip_alignment_under_test", ROOT / "threestudio/models/clip_alignment.py"
+)
+_CLIP_ALIGNMENT = importlib.util.module_from_spec(_MODULE_SPEC)
+assert _MODULE_SPEC.loader is not None
+_MODULE_SPEC.loader.exec_module(_CLIP_ALIGNMENT)
+clip_decay_weight = _CLIP_ALIGNMENT.clip_decay_weight
+normalized_parameter_drift = _CLIP_ALIGNMENT.normalized_parameter_drift
 
 
 def test_clip_alignment_has_warmup_and_cosine_distance_contract():
@@ -54,4 +65,34 @@ def test_headstudio_only_loads_clip_when_its_loss_is_enabled():
     assert "clip_global_weight: 0.0" in config_source
     assert "clip_foreground_weight: 0.0" in config_source
     assert "clip_view_weight: 0.0" in config_source
+    assert "clip_decay_start_step: int = 0" in system_source
+    assert "clip_decay_end_step: int = 0" in system_source
+    assert "lambda_trust: float = 0.0" in system_source
+    assert "self.trust_region_anchor" in system_source
+    assert "normalized_parameter_drift" in system_source
+    assert "clip_decay_weight" in system_source
     assert "lambda_clip: 0.0" in config_source
+
+
+def test_clip_decay_weight_has_stable_linear_window():
+    assert clip_decay_weight(0.006, 7000, 7000, 8000) == pytest.approx(0.006)
+    assert clip_decay_weight(0.006, 7500, 7000, 8000) == pytest.approx(0.003)
+    assert clip_decay_weight(0.006, 8000, 7000, 8000) == pytest.approx(0.0)
+    assert clip_decay_weight(0.006, 9000, 7000, 8000) == pytest.approx(0.0)
+
+
+def test_normalized_parameter_drift_has_gradients_but_detaches_anchor():
+    current = torch.tensor([[2.0, 4.0]], requires_grad=True)
+    anchor = torch.tensor([[1.0, 2.0]], requires_grad=True)
+    normalizer = torch.tensor([[1.0, 2.0]])
+
+    loss = normalized_parameter_drift(current, anchor, normalizer)
+    assert loss.item() == pytest.approx(1.0)
+    loss.backward()
+    assert current.grad is not None
+    assert anchor.grad is None
+
+
+def test_normalized_parameter_drift_rejects_shape_mismatch():
+    with pytest.raises(ValueError, match="same shape"):
+        normalized_parameter_drift(torch.zeros(2, 3), torch.zeros(2, 2))

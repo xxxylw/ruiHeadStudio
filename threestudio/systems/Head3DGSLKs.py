@@ -13,7 +13,12 @@ import threestudio
 from threestudio.systems.base import BaseLift3DSystem
 from threestudio.utils.ops import binary_cross_entropy, dot
 from threestudio.utils.typing import *
-from threestudio.models.clip_alignment import CLIPAlignment, clip_alignment_weight
+from threestudio.models.clip_alignment import (
+    CLIPAlignment,
+    clip_alignment_weight,
+    clip_decay_weight,
+    normalized_parameter_drift,
+)
 
 from gaussiansplatting.gaussian_renderer import render
 from gaussiansplatting.scene import GaussianModel
@@ -65,6 +70,13 @@ class Head3DGSLKsRig(BaseLift3DSystem):
         clip_global_weight: float = 0.0
         clip_foreground_weight: float = 0.0
         clip_view_weight: float = 0.0
+        clip_decay_start_step: int = 0
+        clip_decay_end_step: int = 0
+        lambda_trust: float = 0.0
+        trust_xyz_weight: float = 1.0
+        trust_scaling_weight: float = 1.0
+        trust_opacity_weight: float = 1.0
+        trust_feature_weight: float = 0.25
         use_eye_pose: bool = False
         use_neck_pose: bool = False
 
@@ -351,6 +363,13 @@ class Head3DGSLKsRig(BaseLift3DSystem):
         clip_weight = clip_alignment_weight(
             self.C(self.cfg.loss.lambda_clip), self.true_global_step, self.cfg.clip_start_step
         )
+        if clip_weight > 0.0 and self.cfg.clip_decay_end_step > self.cfg.clip_decay_start_step:
+            clip_weight = clip_decay_weight(
+                clip_weight,
+                self.true_global_step,
+                self.cfg.clip_decay_start_step,
+                self.cfg.clip_decay_end_step,
+            )
         loss_clip = torch.zeros((), device=images.device)
         loss_clip_global = torch.zeros((), device=images.device)
         loss_clip_foreground = torch.zeros((), device=images.device)
@@ -397,6 +416,38 @@ class Head3DGSLKsRig(BaseLift3DSystem):
         self.log("train/loss_clip_global", loss_clip_global)
         self.log("train/loss_clip_foreground", loss_clip_foreground)
         self.log("train/loss_clip_view", loss_clip_view)
+
+        loss_trust_xyz = torch.zeros((), device=images.device)
+        loss_trust_scaling = torch.zeros((), device=images.device)
+        loss_trust_opacity = torch.zeros((), device=images.device)
+        loss_trust_feature = torch.zeros((), device=images.device)
+        lambda_trust = self.C(self.cfg.lambda_trust)
+        if lambda_trust > 0.0 and self.trust_region_anchor is not None and clip_weight > 0.0:
+            anchor = self.trust_region_anchor
+            loss_trust_xyz = normalized_parameter_drift(
+                self.gaussian.get_xyz, anchor["xyz"], anchor["scaling"]
+            )
+            loss_trust_scaling = normalized_parameter_drift(
+                self.gaussian.get_scaling, anchor["scaling"], anchor["scaling"]
+            )
+            loss_trust_opacity = normalized_parameter_drift(
+                self.gaussian.get_opacity, anchor["opacity"]
+            )
+            loss_trust_feature = normalized_parameter_drift(
+                self.gaussian._features_dc, anchor["features_dc"]
+            )
+            loss_trust = (
+                loss_trust_xyz * self.cfg.trust_xyz_weight
+                + loss_trust_scaling * self.cfg.trust_scaling_weight
+                + loss_trust_opacity * self.cfg.trust_opacity_weight
+                + loss_trust_feature * self.cfg.trust_feature_weight
+            )
+            self.log("train/loss_trust", loss_trust)
+            self.log("train/loss_trust_xyz", loss_trust_xyz)
+            self.log("train/loss_trust_scaling", loss_trust_scaling)
+            self.log("train/loss_trust_opacity", loss_trust_opacity)
+            self.log("train/loss_trust_feature", loss_trust_feature)
+            loss = loss + loss_trust * lambda_trust
 
         lambda_scaling = self.C(self.cfg.loss.lambda_scaling)
         lambda_scale_ratio = self.C(self.cfg.loss.lambda_scale_ratio)
@@ -721,6 +772,14 @@ class Head3DGSLKsRig(BaseLift3DSystem):
             threestudio.info(f"Initializing Gaussian state from PLY: {self.cfg.gaussian_init_ply}")
             self.gaussian.load_ply(self.cfg.gaussian_init_ply)
         self.gaussian.training_setup(opt)
+        self.trust_region_anchor = None
+        if self.C(self.cfg.lambda_trust) > 0.0:
+            self.trust_region_anchor = {
+                "xyz": self.gaussian.get_xyz.detach().clone(),
+                "scaling": self.gaussian.get_scaling.detach().clone(),
+                "opacity": self.gaussian.get_opacity.detach().clone(),
+                "features_dc": self.gaussian._features_dc.detach().clone(),
+            }
 
         ret = {
             "optimizer": self.gaussian.optimizer,
