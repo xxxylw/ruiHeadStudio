@@ -107,6 +107,7 @@ system:
   lambda_frequency_quality: 0.0
   lambda_rendered_reference: 0.0
   lambda_reference_statistics: 0.0
+  lambda_artifact_suppression: 0.0
   use_eye_pose: False
   use_neck_pose: False
 

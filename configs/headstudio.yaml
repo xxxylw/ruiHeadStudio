@@ -95,6 +95,7 @@ system:
   clip_view_weight: 0.0
   clip_recovery_model_name: ""
   clip_recovery_weight: 0.0
+  lambda_artifact_suppression: 0.0
   use_eye_pose: False
   use_neck_pose: False
 

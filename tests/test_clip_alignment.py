@@ -18,6 +18,7 @@ frequency_quality_loss = _CLIP_ALIGNMENT.frequency_quality_loss
 quality_ramp_weight = _CLIP_ALIGNMENT.quality_ramp_weight
 rendered_reference_loss = _CLIP_ALIGNMENT.rendered_reference_loss
 reference_statistics_loss = _CLIP_ALIGNMENT.reference_statistics_loss
+artifact_suppression_loss = _CLIP_ALIGNMENT.artifact_suppression_loss
 blend_alignment_losses = _CLIP_ALIGNMENT.blend_alignment_losses
 
 
@@ -228,3 +229,17 @@ def test_reference_statistics_loss_has_finite_gradients_and_alpha_support():
 def test_reference_statistics_loss_rejects_shape_mismatch():
     with pytest.raises(ValueError, match="same shape"):
         reference_statistics_loss(torch.zeros((1, 3, 16, 16)), torch.zeros((1, 3, 15, 16)))
+
+
+def test_artifact_suppression_loss_is_zero_for_constant_image_and_has_gradients():
+    image = torch.full((1, 3, 8, 8), 0.5, requires_grad=True)
+    loss = artifact_suppression_loss(image)
+    assert torch.isclose(loss, torch.zeros_like(loss), atol=1.0e-6)
+    noisy = torch.rand((1, 3, 8, 8), requires_grad=True)
+    artifact_suppression_loss(noisy).backward()
+    assert torch.isfinite(noisy.grad).all()
+
+
+def test_artifact_suppression_loss_rejects_invalid_shapes():
+    with pytest.raises(ValueError):
+        artifact_suppression_loss(torch.zeros((3, 8, 8)))

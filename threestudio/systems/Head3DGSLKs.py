@@ -18,6 +18,7 @@ from threestudio.utils.typing import *
 from threestudio.models.clip_alignment import (
     CLIPAlignment,
     blend_alignment_losses,
+    artifact_suppression_loss,
     clip_alignment_weight,
     clip_decay_weight,
     frequency_quality_loss,
@@ -91,6 +92,7 @@ class Head3DGSLKsRig(BaseLift3DSystem):
         lambda_frequency_quality: float = 0.0
         lambda_rendered_reference: float = 0.0
         lambda_reference_statistics: float = 0.0
+        lambda_artifact_suppression: float = 0.0
         use_eye_pose: bool = False
         use_neck_pose: bool = False
 
@@ -541,6 +543,20 @@ class Head3DGSLKsRig(BaseLift3DSystem):
             )
             loss = loss + loss_reference_statistics * statistics_weight
         self.log("train/loss_reference_statistics", loss_reference_statistics)
+
+        artifact_weight = quality_ramp_weight(
+            self.C(self.cfg.lambda_artifact_suppression),
+            self.true_global_step,
+            self.cfg.quality_start_step,
+            self.cfg.quality_ramp_end_step,
+        )
+        loss_artifact_suppression = torch.zeros((), device=images.device)
+        if artifact_weight > 0.0:
+            loss_artifact_suppression = artifact_suppression_loss(
+                images.permute(0, 3, 1, 2), out["opacity"]
+            )
+            loss = loss + loss_artifact_suppression * artifact_weight
+        self.log("train/loss_artifact_suppression", loss_artifact_suppression)
 
         loss_trust_xyz = torch.zeros((), device=images.device)
         loss_trust_scaling = torch.zeros((), device=images.device)

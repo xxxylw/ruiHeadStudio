@@ -260,6 +260,46 @@ def reference_statistics_loss(
     return 0.6 * contrast_loss + 0.4 * edge_loss
 
 
+def artifact_suppression_loss(
+    images: torch.Tensor,
+    opacity: Optional[torch.Tensor] = None,
+) -> torch.Tensor:
+    """Penalize high-frequency residuals in locally flat, visible regions."""
+    if images.ndim != 4 or images.shape[1] != 3:
+        raise ValueError("images must have shape [B,3,H,W]")
+    if images.shape[-2] < 5 or images.shape[-1] < 5:
+        raise ValueError("images must be at least 5x5")
+
+    weight = torch.ones(
+        (images.shape[0], 1, images.shape[-2], images.shape[-1]),
+        dtype=images.dtype,
+        device=images.device,
+    )
+    if opacity is not None:
+        if opacity.ndim == 4 and opacity.shape[-1] == 1:
+            opacity = opacity.permute(0, 3, 1, 2)
+        elif opacity.ndim == 4 and opacity.shape[1] == 1:
+            pass
+        elif opacity.ndim == 3:
+            opacity = opacity.unsqueeze(1)
+        else:
+            raise ValueError("opacity must be [B,H,W] or [B,1,H,W]")
+        if opacity.shape[0] != images.shape[0] or opacity.shape[-2:] != images.shape[-2:]:
+            raise ValueError("images and opacity must share batch and spatial dimensions")
+        weight = 0.25 + 0.75 * opacity.detach().to(dtype=images.dtype)
+
+    luminance = images.mean(dim=1, keepdim=True)
+    local_mean = F.avg_pool2d(F.pad(luminance, (2, 2, 2, 2), mode="replicate"), kernel_size=5, stride=1)
+    residual = luminance - local_mean
+    edge_x = (luminance[..., :, 1:] - luminance[..., :, :-1]).abs()
+    edge_y = (luminance[..., 1:, :] - luminance[..., :-1, :]).abs()
+    edge = torch.zeros_like(luminance)
+    edge[..., :, :-1] += edge_x
+    edge[..., :-1, :] += edge_y
+    flat_weight = torch.exp(-10.0 * edge.detach())
+    return (residual.abs() * flat_weight * weight).sum() / (flat_weight * weight).sum().clamp_min(1.0e-6)
+
+
 class CLIPAlignment:
     """Frozen CLIP image encoder with a differentiable image preprocessing path."""
 
