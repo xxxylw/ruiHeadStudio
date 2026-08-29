@@ -155,3 +155,26 @@ The fixed-prompt retry completed the full 3,000-step continuation from the round
 Relative to HeadStudio, this run improves ViT-B/16 by `+0.007631`, ViT-B/32 by `+0.000488`, and MUSIQ by `+4.143357`. ViT-L/14 is `-0.005137` below baseline and PIQE is `+4.294634` worse, so the full five-metric success gate remains open. The result supports the proposed component-aware text-GS alignment direction, but it also shows that stronger semantic alignment currently trades against the large CLIP model and no-reference perceptual quality. The next method iteration should introduce an explicit quality-preserving constraint or quality-aware late-stage loss schedule.
 
 The retry manifest and per-metric evidence are under `outputs/text_gs_alignment_refine_alpha_retry5_20260828/refine_multicomponent/`. The consolidated result is `eval/all_metrics/summary.json`; the comparison dashboard was regenerated at `outputs/text_gs_alignment_refine_20260828/dashboard/`.
+
+## Quality Sweep Results (2026-08-30)
+
+Three alpha-aware, batch-1 continuation runs were launched from the same round-2 multi-component checkpoint. They used the exact prompt, 3,000 refinement steps, and the following component weights:
+
+| Run | lambda_clip | Global | Foreground | View |
+| --- | ---: | ---: | ---: | ---: |
+| `quality_l003` | 0.0030 | 0.20 | 0.55 | 0.25 |
+| `balanced_l004` | 0.0040 | 0.30 | 0.45 | 0.25 |
+| `global_l0035` | 0.0035 | 0.40 | 0.35 | 0.25 |
+
+All runs completed and were evaluated on four final views with the combined offline evaluator.
+
+| Run | ViT-L/14 CLIP | ViT-B/16 CLIP | ViT-B/32 CLIP | PIQE | MUSIQ |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| HeadStudio baseline | 0.278400 | 0.313000 | 0.313100 | 59.930000 | 51.360000 |
+| `quality_l003` | 0.270719 | 0.304899 | **0.313624** | 65.130355 | **55.196145** |
+| `balanced_l004` | 0.262153 | 0.310138 | 0.309459 | 65.732342 | 54.653815 |
+| `global_l0035` | 0.263218 | 0.308012 | 0.308804 | 64.660643 | 54.860821 |
+
+`quality_l003` is the strongest sweep variant: it improves ViT-B/32 by `+0.000524` and MUSIQ by `+3.836145`, but the full five-metric gate remains open. The sweep also confirms that increasing the global component does not recover ViT-L/14, while the lower-`lambda_clip` quality-focused schedule gives the best trade-off in this setting. The next iteration should add an explicit quality-preserving regularizer or a late-stage schedule that decays semantic alignment after a perceptual-quality checkpoint.
+
+Reproducibility scripts are `scripts/launch_quality_sweep.sh` and `scripts/evaluate_quality_sweep.sh`. The consolidated dashboard is under `outputs/text_gs_alignment_refine_alpha_sweep_20260830/dashboard/`.
