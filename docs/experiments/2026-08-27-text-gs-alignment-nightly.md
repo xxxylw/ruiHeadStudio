@@ -289,3 +289,18 @@ The rendered-reference teacher keeps a frozen copy of the initialization Gaussia
 | `reference_q006` | 0.006 | **0.290524** | **0.329527** | 0.300779 | 63.233809 | 53.134557 |
 
 The teacher preserves the large CLIP and B/16 gains, but it copies the checkpoint's existing artifacts and suppresses B/32/MUSIQ. It therefore does not solve PIQE and is rejected as the primary quality teacher. The smoke test and all 13 focused tests pass; the full gate remains open. Artifacts are under `outputs/text_gs_render_reference_sweep_20260830/dashboard/`.
+
+## Reference Statistics Teacher Sweep Results (2026-08-30)
+
+`reference_statistics_loss` is a no-reference, frozen-teacher statistic alignment term. It renders the frozen initialization Gaussian model under the current camera and pose, computes local contrast and edge magnitude, and matches those statistics under detached alpha weighting. This avoids copying RGB pixels while preserving local facial structure. Three 2,000-step continuations started from `content_q0010`, with training prompt `a DSLR portrait of Elon Musk`, `lambda_clip=0.0005`, components `0.50/0.30/0.20`, and statistics weights `0.001`, `0.003`, and `0.006`, ramped from step 19,000 to 20,000.
+
+| Run | lambda_reference_statistics | ViT-L/14 CLIP | ViT-B/16 CLIP | ViT-B/32 CLIP | PIQE | MUSIQ |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| HeadStudio baseline | - | 0.278400 | 0.313000 | 0.313100 | 59.930000 | 51.360000 |
+| `statistics_q001` | 0.001 | **0.291274** | **0.334073** | 0.308791 | 61.278472 | **54.062219** |
+| `statistics_q003` | 0.003 | **0.293071** | **0.335430** | 0.308760 | 63.370208 | **54.366879** |
+| `statistics_q006` | 0.006 | **0.291877** | **0.333305** | 0.306259 | 61.034154 | **54.442806** |
+
+`statistics_q006` is the best quality-oriented point (PIQE 61.034154, MUSIQ 54.442806); `statistics_q001` is a slightly stronger CLIP/B16 tradeoff. All three improve ViT-L/14, ViT-B/16, and MUSIQ, but all remain below the ViT-B/32 baseline and above the PIQE baseline, so the full five-metric gate remains open. This is preferable to a rendered RGB teacher because it does not directly copy checkpoint artifacts, but the frozen statistics teacher alone is insufficient for no-reference quality. The next direction is a learned quality proxy or multi-scale perceptual teacher, paired with explicit B/32 recovery.
+
+Artifacts: `outputs/text_gs_reference_statistics_sweep_20260830/dashboard/`, `scripts/launch_reference_statistics_sweep.sh`, and `scripts/evaluate_reference_statistics_sweep.sh`.
