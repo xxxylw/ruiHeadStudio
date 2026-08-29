@@ -381,3 +381,18 @@ The previous calibration used the wrong `content_q0010` checkpoint. This correct
 This is the strongest semantic result so far: `factorized_q005` and `factorized_q020` exceed all three supplied CLIP baselines, and all variants improve MUSIQ. The best joint point still fails PIQE, so the overall five-metric gate remains open by exactly one quality metric. This isolates the remaining research problem to no-reference visual quality rather than text/3DGS alignment.
 
 Artifacts: `outputs/text_gs_b32_factorized_content_calibration_20260830/dashboard/`, `scripts/launch_b32_stats_valid_sweep.sh`, and per-run `parameter_drift.json`.
+
+## Diffusion Guidance Quality Sweep (2026-08-30)
+
+To target PIQE without changing the text alignment objective, this sweep initialized from the true factorized-content checkpoint, fixed ViT-B/32 recovery at `0.05`, and varied the ControlNet diffusion guidance scale (`10`, `15`, `20`). All runs used full precision, the non-finite gradient guard, 500 steps from logical step 7000, and verified non-zero parameter drift.
+
+| Run | guidance scale | ViT-L/14 CLIP | ViT-B/16 CLIP | ViT-B/32 CLIP | PIQE | MUSIQ |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| HeadStudio baseline | - | 0.278400 | 0.313000 | 0.313100 | 59.930000 | 51.360000 |
+| `guidance_q10` | 10 | **0.283251** | **0.342207** | 0.305713 | 62.375967 | **55.8469** |
+| `guidance_q15` | 15 | **0.288240** | **0.344256** | 0.312016 | 63.135094 | **55.4278** |
+| `guidance_q20` | 20 | **0.286276** | **0.338737** | **0.316393** | 61.450295 | **55.5994** |
+
+`guidance_q20` is the best current semantic/quality Pareto point: all three CLIP scores and MUSIQ exceed baseline, B/32 reaches `0.316393`, and PIQE is the lowest observed in a valid run, though still `1.520295` above baseline. Lowering guidance alone is therefore insufficient, but guidance 20 is selected as the initialization for the next quality-only tail phase.
+
+Artifacts: `outputs/text_gs_guidance_quality_sweep_20260830/dashboard/`, `scripts/launch_b32_stats_valid_sweep.sh`, and per-run `parameter_drift.json`.

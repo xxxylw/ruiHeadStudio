@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="322" viewBox="0 0 900 322">
+<rect width="100%" height="100%" fill="#ffffff"/>
+<text x="24" y="32" font-family="Arial" font-size="20" font-weight="700">CLIP metrics vs HeadStudio baseline</text>
+<text x="24" y="78" font-family="Arial" font-size="12">guidance_q10 / ViT-L/14 CLIP</text>
+<rect x="220" y="62" width="460" height="16" fill="#2f6fed" rx="2"/>
+<line x1="672" y1="59" x2="672" y2="82" stroke="#111" stroke-width="1"/>
+<text x="688" y="75" font-family="Arial" font-size="12">0.2833</text>
+<text x="24" y="106" font-family="Arial" font-size="12">guidance_q10 / ViT-B/16 CLIP</text>
+<rect x="220" y="90" width="556" height="16" fill="#2f6fed" rx="2"/>
+<line x1="729" y1="87" x2="729" y2="110" stroke="#111" stroke-width="1"/>
+<text x="784" y="103" font-family="Arial" font-size="12">0.3422</text>
+<text x="24" y="134" font-family="Arial" font-size="12">guidance_q10 / ViT-B/32 CLIP</text>
+<rect x="220" y="118" width="497" height="16" fill="#c44747" rx="2"/>
+<line x1="729" y1="115" x2="729" y2="138" stroke="#111" stroke-width="1"/>
+<text x="725" y="131" font-family="Arial" font-size="12">0.3057</text>
+<text x="24" y="162" font-family="Arial" font-size="12">guidance_q15 / ViT-L/14 CLIP</text>
+<rect x="220" y="146" width="468" height="16" fill="#2f6fed" rx="2"/>
+<line x1="672" y1="143" x2="672" y2="166" stroke="#111" stroke-width="1"/>
+<text x="696" y="159" font-family="Arial" font-size="12">0.2882</text>
+<text x="24" y="190" font-family="Arial" font-size="12">guidance_q15 / ViT-B/16 CLIP</text>
+<rect x="220" y="174" width="560" height="16" fill="#2f6fed" rx="2"/>
+<line x1="729" y1="171" x2="729" y2="194" stroke="#111" stroke-width="1"/>
+<text x="788" y="187" font-family="Arial" font-size="12">0.3443</text>
+<text x="24" y="218" font-family="Arial" font-size="12">guidance_q15 / ViT-B/32 CLIP</text>
+<rect x="220" y="202" width="507" height="16" fill="#c44747" rx="2"/>
+<line x1="729" y1="199" x2="729" y2="222" stroke="#111" stroke-width="1"/>
+<text x="735" y="215" font-family="Arial" font-size="12">0.3120</text>
+<text x="24" y="246" font-family="Arial" font-size="12">guidance_q20 / ViT-L/14 CLIP</text>
+<rect x="220" y="230" width="465" height="16" fill="#2f6fed" rx="2"/>
+<line x1="672" y1="227" x2="672" y2="250" stroke="#111" stroke-width="1"/>
+<text x="693" y="243" font-family="Arial" font-size="12">0.2863</text>
+<text x="24" y="274" font-family="Arial" font-size="12">guidance_q20 / ViT-B/16 CLIP</text>
+<rect x="220" y="258" width="551" height="16" fill="#2f6fed" rx="2"/>
+<line x1="729" y1="255" x2="729" y2="278" stroke="#111" stroke-width="1"/>
+<text x="779" y="271" font-family="Arial" font-size="12">0.3387</text>
+<text x="24" y="302" font-family="Arial" font-size="12">guidance_q20 / ViT-B/32 CLIP</text>
+<rect x="220" y="286" width="514" height="16" fill="#2f6fed" rx="2"/>
+<line x1="729" y1="283" x2="729" y2="306" stroke="#111" stroke-width="1"/>
+<text x="742" y="299" font-family="Arial" font-size="12">0.3164</text>
+</svg>
