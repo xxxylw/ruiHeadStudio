@@ -121,6 +121,13 @@ def test_training_writes_parameter_drift_provenance():
     assert "max_abs_xyz_drift" in source
 
 
+def test_training_writes_gradient_probe_provenance():
+    source = (ROOT / "threestudio/systems/Head3DGSLKs.py").read_text(encoding="utf-8")
+
+    assert "gradient_probe.json" in source
+    assert "grad_is_none" in source
+
+
 def test_clip_decay_weight_has_stable_linear_window():
     assert clip_decay_weight(0.006, 7000, 7000, 8000) == pytest.approx(0.006)
     assert clip_decay_weight(0.006, 7500, 7000, 8000) == pytest.approx(0.003)

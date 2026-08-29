@@ -733,7 +733,22 @@ class Head3DGSLKsRig(BaseLift3DSystem):
 
     def on_after_backward(self):
         self.dataset.skel.betas = self.gaussian.get_shape.detach()
-        # pass
+        if not hasattr(self, "_gradient_probe_written"):
+            values = {}
+            for name, parameter in (
+                ("xyz", self.gaussian._xyz),
+                ("features_dc", self.gaussian._features_dc),
+                ("opacity", self.gaussian._opacity),
+                ("scaling", self.gaussian._scaling),
+            ):
+                values[name] = {
+                    "requires_grad": bool(parameter.requires_grad),
+                    "grad_is_none": parameter.grad is None,
+                    "grad_max_abs": 0.0 if parameter.grad is None else float(parameter.grad.detach().abs().max().item()),
+                }
+            with open(self.get_save_path("gradient_probe.json"), "w") as handle:
+                json.dump(values, handle, indent=2)
+            self._gradient_probe_written = True
 
     def validation_step(self, batch, batch_idx):
         out = self(batch)
