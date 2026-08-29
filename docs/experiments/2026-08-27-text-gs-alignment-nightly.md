@@ -276,3 +276,16 @@ The next experiment factorized the training text to test whether long style desc
 Prompt factorization is the strongest semantic result so far: both short prompts exceed ViT-L/14, B/16, and B/32 baselines, and `identity` also exceeds MUSIQ. The `content` prompt reaches the best B/16 score (`+0.030709`), while the full prompt remains below the ViT-L/14 gate. Quality is still the bottleneck: the best PIQE is `61.410410`, which is `+1.480410` above baseline. This supports separating identity content from style during alignment, followed by a stronger rendered-image quality phase.
 
 Artifacts: `outputs/text_gs_alignment_prompt_factorization_sweep_20260830/dashboard/`, `scripts/launch_prompt_factorization_sweep.sh`, and `scripts/evaluate_prompt_factorization_sweep.sh`.
+
+## Rendered Reference Teacher Sweep Results (2026-08-30)
+
+The rendered-reference teacher keeps a frozen copy of the initialization Gaussian model and renders it under the exact current camera and pose. The current render is then regularized with a masked Charbonnier RGB loss plus gradient loss. Three 2,000-step continuations started from `content_q0010`, used the factorized content prompt, `lambda_clip=0.0005`, and reference weights `0.001`, `0.003`, and `0.006`.
+
+| Run | lambda_rendered_reference | ViT-L/14 CLIP | ViT-B/16 CLIP | ViT-B/32 CLIP | PIQE | MUSIQ |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| HeadStudio baseline | - | 0.278400 | 0.313000 | 0.313100 | 59.930000 | 51.360000 |
+| `reference_q001` | 0.001 | **0.288734** | **0.334765** | 0.299832 | 64.511250 | 54.543825 |
+| `reference_q003` | 0.003 | **0.290226** | **0.337575** | 0.299237 | 63.448435 | 54.117458 |
+| `reference_q006` | 0.006 | **0.290524** | **0.329527** | 0.300779 | 63.233809 | 53.134557 |
+
+The teacher preserves the large CLIP and B/16 gains, but it copies the checkpoint's existing artifacts and suppresses B/32/MUSIQ. It therefore does not solve PIQE and is rejected as the primary quality teacher. The smoke test and all 13 focused tests pass; the full gate remains open. Artifacts are under `outputs/text_gs_render_reference_sweep_20260830/dashboard/`.
