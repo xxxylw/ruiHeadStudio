@@ -9,6 +9,7 @@ source /home/huangqirui/miniconda3/etc/profile.d/conda.sh
 conda activate ruiheadstudio
 set -u
 export HF_HUB_OFFLINE=1 DIFFUSERS_OFFLINE=1 TRANSFORMERS_OFFLINE=1
+export HEADSTUDIO_FINAL_STEP=12000
 
 for tag in semantic_l0003 semantic_l0006 semantic_l0010; do
   out="$RUN_ROOT/$tag"

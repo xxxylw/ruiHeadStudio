@@ -191,3 +191,18 @@ The trust-region smoke run continued from the round-2 multi-component checkpoint
 The trust-region variant improves ViT-B/16 by `+0.002043` and MUSIQ by `+4.599326`, but it does not preserve PIQE or the larger/smaller CLIP models: ViT-L/14 is `-0.012123`, ViT-B/32 is `-0.005749`, and PIQE is `+6.497173` relative to HeadStudio. Thus the proposed regularizer is implemented and reproducibly evaluated, but this parameterization does not pass the full gate. The result suggests that parameter anchoring alone is not a sufficient perceptual-quality constraint; the next iteration should anchor rendered-image features or add a no-reference quality proxy, with a lower trust weight and an earlier quality checkpoint.
 
 Artifacts: `outputs/text_gs_alignment_trust_region_20260830/trust_l003_anchor/eval/all_metrics/summary.json`, `outputs/text_gs_alignment_trust_region_20260830/dashboard/`, `scripts/launch_trust_region_smoke.sh`, and `scripts/evaluate_trust_region_smoke.sh`.
+
+## Semantic Checkpoint Quality Sweep Results (2026-08-30)
+
+Three batch-1 continuation runs started from the strongest prior semantic checkpoint, `outputs/text_gs_alignment_refine_alpha_20260828/refine_semantic/runs/refine_semantic/save/last.ply`. Each ran 2,000 continuation steps, from global step 10,000 to 12,000, with alpha-aware component weights `global=0.20`, `foreground=0.55`, `view=0.25`, `max_grad_norm=0.0005`, and CLIP decay scheduled from steps 11,000 to 12,000.
+
+| Run | lambda_clip | ViT-L/14 CLIP | ViT-B/16 CLIP | ViT-B/32 CLIP | PIQE | MUSIQ |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| HeadStudio baseline | - | 0.278400 | 0.313000 | 0.313100 | 59.930000 | 51.360000 |
+| `semantic_l0003` | 0.0003 | 0.271005 | **0.319354** | 0.309028 | 64.282049 | **56.483161** |
+| `semantic_l0006` | 0.0006 | 0.274738 | 0.313507 | 0.309509 | 62.724339 | 55.834595 |
+| `semantic_l0010` | 0.0010 | 0.274554 | 0.317739 | 0.310083 | 61.862961 | 56.447024 |
+
+`semantic_l0003` is the best B/16 and MUSIQ trade-off, improving them by `+0.006354` and `+5.123161`. `semantic_l0010` gives the best PIQE in this sweep, but it is still `+1.932961` above the baseline. None of the three passes the full five-metric gate. The experiment confirms that late low-weight semantic refinement can preserve the prior checkpoint better than a stronger continuation, but image quality remains the limiting factor.
+
+The evaluator initially assumed filenames at fixed step 10,000 while these continuation runs saved final views at step 12,000. The evaluation manifests were corrected with aliases pointing to the actual `it12000-*` images; no image content was changed. Final summaries are under `outputs/text_gs_alignment_semantic_quality_sweep_20260830/<tag>/eval/all_metrics/summary.json`, with the consolidated dashboard under `outputs/text_gs_alignment_semantic_quality_sweep_20260830/dashboard/`.

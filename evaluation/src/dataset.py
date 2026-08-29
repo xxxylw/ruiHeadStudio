@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import os
 from pathlib import Path
 
 
-FINAL_STEP = 10000
+FINAL_STEP = int(os.environ.get("HEADSTUDIO_FINAL_STEP", "10000"))
 VIEW_INDICES = (0, 1, 2, 3)
 
 
