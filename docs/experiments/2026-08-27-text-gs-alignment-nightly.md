@@ -366,3 +366,18 @@ Because the content-initialized statistics sweep reduced B/32, this ablation rem
 The isolated B/32 calibration also failed to preserve the content checkpoint's B/32 score and substantially worsened PIQE. It does improve L/14, B/16, and MUSIQ over baseline, but the result rejects a simple late scalar B/32 blend as the solution. The next method should be view- and frequency-selective calibration rather than a global teacher weight.
 
 Artifacts: `outputs/text_gs_b32_calibration_sweep_20260830/dashboard/` and `scripts/launch_b32_stats_valid_sweep.sh`.
+
+## True Factorized-Content B/32 Calibration (2026-08-30)
+
+The previous calibration used the wrong `content_q0010` checkpoint. This corrected sweep initializes from the prompt-factorization `content` checkpoint, whose starting ViT-B/32 score is `0.316544`, and applies only a full-precision ViT-B/32 recovery calibration with blend weights `0.05`, `0.10`, and `0.20`. Each run uses 500 steps from logical step 7000, the non-finite gradient guard, and verified non-zero parameter drift.
+
+| Run | B/32 recovery blend | ViT-L/14 CLIP | ViT-B/16 CLIP | ViT-B/32 CLIP | PIQE | MUSIQ |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| HeadStudio baseline | - | 0.278400 | 0.313000 | 0.313100 | 59.930000 | 51.360000 |
+| `factorized_q005` | 0.05 | **0.289407** | **0.337941** | **0.313192** | 62.309931 | **54.5629** |
+| `factorized_q010` | 0.10 | **0.287853** | **0.340441** | 0.310951 | 64.140808 | **54.8721** |
+| `factorized_q020` | 0.20 | **0.289943** | **0.341427** | 0.313122 | 61.982813 | **55.7792** |
+
+This is the strongest semantic result so far: `factorized_q005` and `factorized_q020` exceed all three supplied CLIP baselines, and all variants improve MUSIQ. The best joint point still fails PIQE, so the overall five-metric gate remains open by exactly one quality metric. This isolates the remaining research problem to no-reference visual quality rather than text/3DGS alignment.
+
+Artifacts: `outputs/text_gs_b32_factorized_content_calibration_20260830/dashboard/`, `scripts/launch_b32_stats_valid_sweep.sh`, and per-run `parameter_drift.json`.
