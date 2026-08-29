@@ -336,3 +336,18 @@ This is the first continuation sweep in this branch with finite gradients and no
 Artifacts: `outputs/text_gs_b32_stats_valid_sweep_v8_20260830/dashboard/`, `scripts/launch_b32_stats_valid_sweep.sh`, `gradient_probe.json`, and `parameter_drift.json`.
 
 The earlier `text_gs_b32_stats_tail_sweep_20260830`, v2, v3, v4, and v7 runs are retained as debugging evidence only and are excluded from quantitative conclusions because of incorrect manifest paths, zero parameter drift, AMP NaNs, or data-loader failures.
+
+## Content-Initialized Guarded Sweep (2026-08-30)
+
+To preserve the B/32 gain from prompt-factorized training, this sweep initialized all variants from `content_q0010` rather than the earlier B/32 recovery checkpoints. It retained the ViT-B/32 recovery teacher (`0.15`) and swept reference-statistics weights `0.0002`, `0.0005`, and `0.0010`. Training used full precision, non-finite gradient protection, logical step 7000, and 500 continuation steps; each run recorded non-zero parameter drift and was evaluated at `it7500` with the corrected per-run manifest.
+
+| Run | statistics weight | ViT-L/14 CLIP | ViT-B/16 CLIP | ViT-B/32 CLIP | PIQE | MUSIQ |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| HeadStudio baseline | - | 0.278400 | 0.313000 | 0.313100 | 59.930000 | 51.360000 |
+| `content_valid_q0002` | 0.0002 | **0.287430** | **0.339916** | 0.311484 | 63.099900 | **54.2676** |
+| `content_valid_q0005` | 0.0005 | **0.289982** | **0.336910** | 0.309158 | 62.922252 | **54.4292** |
+| `content_valid_q0010` | 0.0010 | **0.287607** | **0.336949** | 0.310140 | 61.468688 | **53.2755** |
+
+The content initialization preserved strong L/14, B/16, and MUSIQ improvements, but the short continuation reduced B/32 below its `content_q0010` starting value and did not bring PIQE below baseline. This rejects the current recovery/statistics combination as a sufficient final method, while validating the full-precision continuation and evaluation protocol. The next direction should decouple B/32 alignment from the quality teacher, for example with a late B/32-only calibration phase and a differentiable no-reference quality proxy.
+
+Artifacts: `outputs/text_gs_b32_content_valid_sweep_20260830/dashboard/` and `scripts/launch_b32_stats_valid_sweep.sh`.
