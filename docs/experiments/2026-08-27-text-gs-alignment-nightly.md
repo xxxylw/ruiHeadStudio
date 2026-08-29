@@ -351,3 +351,18 @@ To preserve the B/32 gain from prompt-factorized training, this sweep initialize
 The content initialization preserved strong L/14, B/16, and MUSIQ improvements, but the short continuation reduced B/32 below its `content_q0010` starting value and did not bring PIQE below baseline. This rejects the current recovery/statistics combination as a sufficient final method, while validating the full-precision continuation and evaluation protocol. The next direction should decouple B/32 alignment from the quality teacher, for example with a late B/32-only calibration phase and a differentiable no-reference quality proxy.
 
 Artifacts: `outputs/text_gs_b32_content_valid_sweep_20260830/dashboard/` and `scripts/launch_b32_stats_valid_sweep.sh`.
+
+## Late ViT-B/32 Calibration Sweep (2026-08-30)
+
+Because the content-initialized statistics sweep reduced B/32, this ablation removed the reference-statistics teacher and varied only the ViT-B/32 recovery blend (`0.05`, `0.10`, `0.20`). All runs used full precision, the NaN-gradient guard, the `content_q0010` initialization, logical step 7000, and 500 steps; all produced non-zero parameter drift and were evaluated at `it7500`.
+
+| Run | B/32 recovery blend | ViT-L/14 CLIP | ViT-B/16 CLIP | ViT-B/32 CLIP | PIQE | MUSIQ |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| HeadStudio baseline | - | 0.278400 | 0.313000 | 0.313100 | 59.930000 | 51.360000 |
+| `calibration_q005` | 0.05 | **0.288989** | **0.337208** | 0.298028 | 63.354777 | **53.7255** |
+| `calibration_q010` | 0.10 | **0.288236** | **0.338016** | 0.307319 | 63.591640 | **53.7059** |
+| `calibration_q020` | 0.20 | **0.287298** | **0.340838** | 0.305734 | 62.199286 | **54.5462** |
+
+The isolated B/32 calibration also failed to preserve the content checkpoint's B/32 score and substantially worsened PIQE. It does improve L/14, B/16, and MUSIQ over baseline, but the result rejects a simple late scalar B/32 blend as the solution. The next method should be view- and frequency-selective calibration rather than a global teacher weight.
+
+Artifacts: `outputs/text_gs_b32_calibration_sweep_20260830/dashboard/` and `scripts/launch_b32_stats_valid_sweep.sh`.
