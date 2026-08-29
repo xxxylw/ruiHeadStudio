@@ -2,7 +2,7 @@
 set -euo pipefail
 
 ROOT=/home/huangqirui/Projects/ruiHeadStudio
-RUN_ROOT="$ROOT/outputs/text_gs_b32_stats_valid_sweep_v6_20260830"
+RUN_ROOT="$ROOT/outputs/text_gs_b32_stats_valid_sweep_v7_20260830"
 BASE_ROOT="$ROOT/outputs/text_gs_b32_recovery_fast_sweep_20260830"
 PROMPT='a DSLR portrait of Elon Musk'
 set +u
@@ -21,7 +21,7 @@ launch_variant() {
   CUDA_VISIBLE_DEVICES="$gpu" nohup python3 launch.py --config configs/headstudio_retry.yaml --train \
     "exp_root_dir=$out" "name=runs" "tag=$tag" "use_timestamp=False" \
     "system.prompt_processor.prompt=$PROMPT" "system.guidance.guidance_scale=25" \
-    "trainer.max_steps=1" "trainer.precision=32-true" "data.batch_size=1" "system.gaussian_init_ply=$base_ply" \
+    "trainer.max_steps=500" "trainer.precision=32-true" "data.batch_size=1" "system.gaussian_init_ply=$base_ply" \
     "system.gaussian_init_step=7000" "system.clip_start_step=7000" \
     "system.clip_decay_start_step=7400" "system.clip_decay_end_step=7500" \
     "system.quality_start_step=7000" "system.quality_ramp_end_step=7500" \
