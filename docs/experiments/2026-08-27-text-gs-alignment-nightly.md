@@ -249,6 +249,19 @@ The global-only variants improve B/16, while `global_l0010` improves B/32 and MU
 
 Artifacts: `outputs/text_gs_alignment_global_recovery_sweep_20260830/dashboard/`, `scripts/launch_global_recovery_sweep.sh`, and `scripts/evaluate_global_recovery_sweep.sh`.
 
+## Content Checkpoint Quality Sweep Results (2026-08-30)
+
+Starting from the strongest prompt-factorized `content` checkpoint, three 2,000-step continuations used the training prompt `a DSLR portrait of Elon Musk`, CLIP component weights `0.50/0.30/0.20`, `lambda_clip=0.0005`, and frequency quality weights `0.0010`, `0.0020`, and `0.0040`.
+
+| Run | lambda_frequency_quality | ViT-L/14 CLIP | ViT-B/16 CLIP | ViT-B/32 CLIP | PIQE | MUSIQ |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| HeadStudio baseline | - | 0.278400 | 0.313000 | 0.313100 | 59.930000 | 51.360000 |
+| `content_q0010` | 0.0010 | **0.288824** | **0.335375** | 0.302853 | 62.309422 | **53.899444** |
+| `content_q0020` | 0.0020 | **0.288860** | **0.328856** | 0.304970 | 62.624196 | **55.033799** |
+| `content_q0040` | 0.0040 | **0.287199** | **0.337779** | 0.310882 | 64.685421 | 54.088773 |
+
+The sweep preserves strong ViT-L/14 and B/16 gains, with `content_q0040` reaching B/16 `0.337779`, but stronger frequency weights do not lower PIQE: the best is `62.309422`, still `+2.379422` above baseline. This rejects frequency smoothing as a sufficient quality teacher and motivates a rendered-image reference or learned no-reference quality proxy. All summaries and the visual dashboard are under `outputs/text_gs_alignment_content_quality_sweep_20260830/`.
+
 ## Prompt Factorization Sweep Results (2026-08-30)
 
 The next experiment factorized the training text to test whether long style descriptors dilute identity alignment. All three runs continued for 2,000 steps from `mixed_l0010`, retained the frequency quality gate at `0.0005`, used CLIP component weights `global=0.50`, `foreground=0.30`, `view=0.20`, and were evaluated against the original full prompt.
