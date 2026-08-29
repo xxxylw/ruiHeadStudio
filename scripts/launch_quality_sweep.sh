@@ -10,8 +10,10 @@ if [[ ! -f "$BASE_PLY" ]]; then
   exit 1
 fi
 
+set +u
 source /home/huangqirui/miniconda3/etc/profile.d/conda.sh
 conda activate ruiheadstudio
+set -u
 export HF_HUB_OFFLINE=1
 export DIFFUSERS_OFFLINE=1
 export TRANSFORMERS_OFFLINE=1
