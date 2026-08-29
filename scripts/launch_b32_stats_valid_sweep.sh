@@ -2,7 +2,7 @@
 set -euo pipefail
 
 ROOT=/home/huangqirui/Projects/ruiHeadStudio
-RUN_ROOT="$ROOT/outputs/text_gs_b32_stats_valid_sweep_v2_20260830"
+RUN_ROOT="$ROOT/outputs/text_gs_b32_stats_valid_sweep_v3_20260830"
 BASE_ROOT="$ROOT/outputs/text_gs_b32_recovery_fast_sweep_20260830"
 PROMPT='a DSLR portrait of Elon Musk'
 set +u
@@ -22,9 +22,9 @@ launch_variant() {
     "exp_root_dir=$out" "name=runs" "tag=$tag" "use_timestamp=False" \
     "system.prompt_processor.prompt=$PROMPT" "system.guidance.guidance_scale=25" \
     "trainer.max_steps=500" "data.batch_size=1" "system.gaussian_init_ply=$base_ply" \
-    "system.gaussian_init_step=0" "system.clip_start_step=0" \
-    "system.clip_decay_start_step=400" "system.clip_decay_end_step=500" \
-    "system.quality_start_step=0" "system.quality_ramp_end_step=500" \
+    "system.gaussian_init_step=7000" "system.clip_start_step=7000" \
+    "system.clip_decay_start_step=7400" "system.clip_decay_end_step=7500" \
+    "system.quality_start_step=7000" "system.quality_ramp_end_step=7500" \
     "system.max_grad=0.0005" "system.area_relax=True" "system.loss.lambda_clip=0.0005" \
     "system.lambda_frequency_quality=0.0" "system.lambda_rendered_reference=0.0" \
     "system.lambda_reference_statistics=$stats_weight" \
