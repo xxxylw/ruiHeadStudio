@@ -2,8 +2,8 @@
 set -euo pipefail
 
 ROOT=/home/huangqirui/Projects/ruiHeadStudio
-RUN_ROOT="$ROOT/outputs/text_gs_b32_calibration_sweep_20260830"
-BASE_ROOT="$ROOT/outputs/text_gs_alignment_content_quality_sweep_20260830"
+RUN_ROOT="$ROOT/outputs/text_gs_b32_factorized_content_calibration_20260830"
+BASE_ROOT="$ROOT/outputs/text_gs_alignment_prompt_factorization_sweep_20260830"
 PROMPT='a DSLR portrait of Elon Musk'
 set +u
 source /home/huangqirui/miniconda3/etc/profile.d/conda.sh
@@ -35,6 +35,6 @@ launch_variant() {
   printf 'launched tag=%s gpu=%s pid=%s\n' "$tag" "$gpu" "$(cat "$out/train.pid")"
 }
 
-launch_variant 0 calibration_q005 0.05 content_q0010
-launch_variant 1 calibration_q010 0.10 content_q0010
-launch_variant 2 calibration_q020 0.20 content_q0010
+launch_variant 0 factorized_q005 0.05 content
+launch_variant 1 factorized_q010 0.10 content
+launch_variant 2 factorized_q020 0.20 content
