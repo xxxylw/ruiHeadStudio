@@ -319,3 +319,20 @@ The original dual-teacher continuation was computationally too slow, so its thre
 The fast continuation confirms that B/32 recovery is not enough by itself: all three runs remain below the B/32 baseline and above the PIQE baseline, although they improve L/14, B/16, and MUSIQ. `recovery_fast_q045` is the best MUSIQ point, while `recovery_fast_q015` is the strongest B/16 point. The full five-metric gate therefore remains open. The result rules out simply increasing B/32 loss weight as the quality solution; the next experiment should use a learned no-reference quality proxy or multi-scale perceptual teacher and explicitly calibrate all three CLIP backbones.
 
 Artifacts: `outputs/text_gs_b32_recovery_fast_sweep_20260830/dashboard/`, `scripts/launch_b32_recovery_fast_sweep.sh`, `scripts/evaluate_b32_recovery_fast_sweep.sh`, and `scripts/dashboard_b32_recovery_fast_after_eval.sh`.
+
+## Guarded Full-Precision B/32 + Statistics Continuation (2026-08-30)
+
+Several short continuation probes exposed two reproducibility failures: loading a PLY left `max_radii2D` at the old point count, and 16-bit AMP produced non-finite Gaussian gradients. The implementation now resets pointwise buffers on PLY reload, sanitizes non-finite gradients before the optimizer step, and records `gradient_probe.json` plus `parameter_drift.json`. The valid v8 sweep uses `precision=32-true`, starts from the recovered PLY at logical step 7000, runs 500 steps, keeps a ViT-B/32 recovery teacher at `0.15`, and sweeps reference-statistics weights `0.0002`, `0.0005`, and `0.0010`.
+
+| Run | statistics weight | ViT-L/14 CLIP | ViT-B/16 CLIP | ViT-B/32 CLIP | PIQE | MUSIQ | mean XYZ drift |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| HeadStudio baseline | - | 0.278400 | 0.313000 | 0.313100 | 59.930000 | 51.360000 | - |
+| `stats_valid_q0002` | 0.0002 | **0.287690** | **0.339301** | 0.307942 | 62.258522 | **53.7160** | 0.003800 |
+| `stats_valid_q0005` | 0.0005 | **0.288221** | **0.339197** | 0.305951 | 61.579051 | **54.9192** | 0.003848 |
+| `stats_valid_q0010` | 0.0010 | **0.288694** | **0.338580** | 0.306951 | 63.995110 | **52.6714** | 0.003843 |
+
+This is the first continuation sweep in this branch with finite gradients and non-zero parameter drift. `stats_valid_q0005` is the best joint point for B/32 and MUSIQ, while all three improve L/14 and B/16. However, all remain above the PIQE baseline and below the supplied B/32 baseline, so the full five-metric gate remains open. The result validates the training path and rejects this particular teacher-weight range as sufficient; the next method should target no-reference quality without copying the frozen checkpoint statistics.
+
+Artifacts: `outputs/text_gs_b32_stats_valid_sweep_v8_20260830/dashboard/`, `scripts/launch_b32_stats_valid_sweep.sh`, `gradient_probe.json`, and `parameter_drift.json`.
+
+The earlier `text_gs_b32_stats_tail_sweep_20260830`, v2, v3, v4, and v7 runs are retained as debugging evidence only and are excluded from quantitative conclusions because of incorrect manifest paths, zero parameter drift, AMP NaNs, or data-loader failures.
