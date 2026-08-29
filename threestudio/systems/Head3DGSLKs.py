@@ -21,6 +21,7 @@ from threestudio.models.clip_alignment import (
     frequency_quality_loss,
     normalized_parameter_drift,
     quality_ramp_weight,
+    reference_statistics_loss,
     rendered_reference_loss,
 )
 
@@ -85,6 +86,7 @@ class Head3DGSLKsRig(BaseLift3DSystem):
         quality_ramp_end_step: int = 0
         lambda_frequency_quality: float = 0.0
         lambda_rendered_reference: float = 0.0
+        lambda_reference_statistics: float = 0.0
         use_eye_pose: bool = False
         use_neck_pose: bool = False
 
@@ -460,7 +462,14 @@ class Head3DGSLKsRig(BaseLift3DSystem):
             self.cfg.quality_ramp_end_step,
         )
         loss_rendered_reference = torch.zeros((), device=images.device)
-        if reference_weight > 0.0:
+        statistics_weight = quality_ramp_weight(
+            self.C(self.cfg.lambda_reference_statistics),
+            self.true_global_step,
+            self.cfg.quality_start_step,
+            self.cfg.quality_ramp_end_step,
+        )
+        reference_out = None
+        if reference_weight > 0.0 or statistics_weight > 0.0:
             if self.reference_gaussian is None:
                 raise RuntimeError("rendered reference loss is enabled without a reference Gaussian")
             with torch.no_grad():
@@ -469,6 +478,7 @@ class Head3DGSLKsRig(BaseLift3DSystem):
                     gaussian_model=self.reference_gaussian,
                     track_stats=False,
                 )
+        if reference_weight > 0.0:
             loss_rendered_reference = rendered_reference_loss(
                 images.permute(0, 3, 1, 2),
                 reference_out["comp_rgb"].permute(0, 3, 1, 2),
@@ -476,6 +486,16 @@ class Head3DGSLKsRig(BaseLift3DSystem):
             )
             loss = loss + loss_rendered_reference * reference_weight
         self.log("train/loss_rendered_reference", loss_rendered_reference)
+
+        loss_reference_statistics = torch.zeros((), device=images.device)
+        if statistics_weight > 0.0:
+            loss_reference_statistics = reference_statistics_loss(
+                images.permute(0, 3, 1, 2),
+                reference_out["comp_rgb"].permute(0, 3, 1, 2),
+                out["opacity"],
+            )
+            loss = loss + loss_reference_statistics * statistics_weight
+        self.log("train/loss_reference_statistics", loss_reference_statistics)
 
         loss_trust_xyz = torch.zeros((), device=images.device)
         loss_trust_scaling = torch.zeros((), device=images.device)
@@ -833,7 +853,7 @@ class Head3DGSLKsRig(BaseLift3DSystem):
             self.gaussian.load_ply(self.cfg.gaussian_init_ply)
         self.gaussian.training_setup(opt)
         self.reference_gaussian = None
-        if self.C(self.cfg.lambda_rendered_reference) > 0.0:
+        if self.C(self.cfg.lambda_rendered_reference) > 0.0 or self.C(self.cfg.lambda_reference_statistics) > 0.0:
             self.reference_gaussian = copy.deepcopy(self.gaussian)
             self.reference_gaussian.model.eval()
             for parameter in self.reference_gaussian.model.parameters():

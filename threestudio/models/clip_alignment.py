@@ -199,6 +199,56 @@ def rendered_reference_loss(
     return 0.7 * color + 0.3 * (edge_x + edge_y)
 
 
+def reference_statistics_loss(
+    images: torch.Tensor,
+    references: torch.Tensor,
+    opacity: Optional[torch.Tensor] = None,
+) -> torch.Tensor:
+    """Match local contrast and edge magnitude without copying teacher pixels."""
+    if images.ndim != 4 or images.shape[1] != 3:
+        raise ValueError("images must have shape [B,3,H,W]")
+    if references.shape != images.shape:
+        raise ValueError("images and references must have the same shape")
+    if images.shape[-2] < 5 or images.shape[-1] < 5:
+        raise ValueError("images must be at least 5x5")
+
+    weight = torch.ones(
+        (images.shape[0], 1, images.shape[-2], images.shape[-1]),
+        dtype=images.dtype,
+        device=images.device,
+    )
+    if opacity is not None:
+        if opacity.ndim == 4 and opacity.shape[-1] == 1:
+            opacity = opacity.permute(0, 3, 1, 2)
+        elif opacity.ndim == 4 and opacity.shape[1] == 1:
+            pass
+        elif opacity.ndim == 3:
+            opacity = opacity.unsqueeze(1)
+        else:
+            raise ValueError("opacity must be [B,H,W] or [B,1,H,W]")
+        if opacity.shape[0] != images.shape[0] or opacity.shape[-2:] != images.shape[-2:]:
+            raise ValueError("images and opacity must share batch and spatial dimensions")
+        weight = 0.25 + 0.75 * opacity.detach().to(dtype=images.dtype)
+
+    def statistics(rgb: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+        local_mean = F.avg_pool2d(rgb, kernel_size=5, stride=1, padding=2)
+        local_second = F.avg_pool2d(rgb.square(), kernel_size=5, stride=1, padding=2)
+        contrast = (local_second - local_mean.square()).clamp_min(0.0).sqrt()
+        dx = rgb[..., :, 1:] - rgb[..., :, :-1]
+        dy = rgb[..., 1:, :] - rgb[..., :-1, :]
+        edge = torch.zeros_like(rgb)
+        edge[..., :, 1:] += dx.abs()
+        edge[..., 1:, :] += dy.abs()
+        return contrast, edge
+
+    current_contrast, current_edge = statistics(images * weight)
+    with torch.no_grad():
+        reference_contrast, reference_edge = statistics(references.detach() * weight)
+    contrast_loss = ((current_contrast - reference_contrast).abs() * weight).mean()
+    edge_loss = ((current_edge - reference_edge).abs() * weight).mean()
+    return 0.6 * contrast_loss + 0.4 * edge_loss
+
+
 class CLIPAlignment:
     """Frozen CLIP image encoder with a differentiable image preprocessing path."""
 
