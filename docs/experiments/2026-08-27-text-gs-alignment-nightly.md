@@ -178,3 +178,16 @@ All runs completed and were evaluated on four final views with the combined offl
 `quality_l003` is the strongest sweep variant: it improves ViT-B/32 by `+0.000524` and MUSIQ by `+3.836145`, but the full five-metric gate remains open. The sweep also confirms that increasing the global component does not recover ViT-L/14, while the lower-`lambda_clip` quality-focused schedule gives the best trade-off in this setting. The next iteration should add an explicit quality-preserving regularizer or a late-stage schedule that decays semantic alignment after a perceptual-quality checkpoint.
 
 Reproducibility scripts are `scripts/launch_quality_sweep.sh` and `scripts/evaluate_quality_sweep.sh`. The consolidated dashboard is under `outputs/text_gs_alignment_refine_alpha_sweep_20260830/dashboard/`.
+
+## Trust-Region Smoke Results (2026-08-30)
+
+The trust-region smoke run continued from the round-2 multi-component checkpoint for 3,000 batch-1 steps. It used alpha-aware component weights `global=0.20`, `foreground=0.55`, `view=0.25`, `lambda_clip=0.003`, `lambda_trust=0.02`, and linearly decayed the CLIP weight from global step 9,000 to 10,000. The trust penalty constrained normalized drift of XYZ, scale, opacity, and DC color relative to the starting PLY.
+
+| Run | ViT-L/14 CLIP | ViT-B/16 CLIP | ViT-B/32 CLIP | PIQE | MUSIQ |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| HeadStudio baseline | 0.278400 | 0.313000 | 0.313100 | 59.930000 | 51.360000 |
+| `trust_l003_anchor` | 0.266277 | **0.315043** | 0.307351 | 66.427173 | **55.959326** |
+
+The trust-region variant improves ViT-B/16 by `+0.002043` and MUSIQ by `+4.599326`, but it does not preserve PIQE or the larger/smaller CLIP models: ViT-L/14 is `-0.012123`, ViT-B/32 is `-0.005749`, and PIQE is `+6.497173` relative to HeadStudio. Thus the proposed regularizer is implemented and reproducibly evaluated, but this parameterization does not pass the full gate. The result suggests that parameter anchoring alone is not a sufficient perceptual-quality constraint; the next iteration should anchor rendered-image features or add a no-reference quality proxy, with a lower trust weight and an earlier quality checkpoint.
+
+Artifacts: `outputs/text_gs_alignment_trust_region_20260830/trust_l003_anchor/eval/all_metrics/summary.json`, `outputs/text_gs_alignment_trust_region_20260830/dashboard/`, `scripts/launch_trust_region_smoke.sh`, and `scripts/evaluate_trust_region_smoke.sh`.
