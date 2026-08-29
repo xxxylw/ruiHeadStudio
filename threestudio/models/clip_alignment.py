@@ -69,6 +69,17 @@ def cosine_alignment_loss(image_features: torch.Tensor, text_features: torch.Ten
     return (1.0 - F.cosine_similarity(image_features, text_features, dim=-1)).mean()
 
 
+def blend_alignment_losses(
+    primary: torch.Tensor,
+    recovery: torch.Tensor,
+    recovery_weight: float,
+) -> torch.Tensor:
+    """Interpolate primary and recovery teacher losses with an explicit gate."""
+    if not 0.0 <= float(recovery_weight) <= 1.0:
+        raise ValueError("recovery_weight must be between 0 and 1")
+    return primary * (1.0 - float(recovery_weight)) + recovery * float(recovery_weight)
+
+
 def foreground_crop(images: torch.Tensor, opacity: torch.Tensor, padding: float = 0.12) -> torch.Tensor:
     """Crop each render to its visible foreground before CLIP resizing.
 

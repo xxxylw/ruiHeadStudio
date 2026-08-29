@@ -18,6 +18,7 @@ frequency_quality_loss = _CLIP_ALIGNMENT.frequency_quality_loss
 quality_ramp_weight = _CLIP_ALIGNMENT.quality_ramp_weight
 rendered_reference_loss = _CLIP_ALIGNMENT.rendered_reference_loss
 reference_statistics_loss = _CLIP_ALIGNMENT.reference_statistics_loss
+blend_alignment_losses = _CLIP_ALIGNMENT.blend_alignment_losses
 
 
 def test_clip_alignment_has_warmup_and_cosine_distance_contract():
@@ -28,6 +29,19 @@ def test_clip_alignment_has_warmup_and_cosine_distance_contract():
     assert "def cosine_alignment_loss(" in source
     assert "1.0 - F.cosine_similarity" in source
     assert 'download_root=os.path.expanduser("~/.cache/clip")' in source
+
+
+def test_blend_alignment_losses_interpolates_two_frozen_teachers():
+    primary = torch.tensor(0.2)
+    recovery = torch.tensor(0.8)
+    assert blend_alignment_losses(primary, recovery, 0.0).item() == pytest.approx(0.2)
+    assert blend_alignment_losses(primary, recovery, 1.0).item() == pytest.approx(0.8)
+    assert blend_alignment_losses(primary, recovery, 0.25).item() == pytest.approx(0.35)
+
+
+def test_blend_alignment_losses_rejects_invalid_weight():
+    with pytest.raises(ValueError, match="between 0 and 1"):
+        blend_alignment_losses(torch.tensor(0.2), torch.tensor(0.8), 1.1)
 
 
 def test_clip_alignment_supports_foreground_crops_and_view_conditioned_text():
@@ -54,6 +68,9 @@ def test_headstudio_only_loads_clip_when_its_loss_is_enabled():
     assert "clip_global_weight: float = 0.0" in system_source
     assert "clip_foreground_weight: float = 0.0" in system_source
     assert "clip_view_weight: float = 0.0" in system_source
+    assert "clip_recovery_model_name: str = \"\"" in system_source
+    assert "clip_recovery_weight: float = 0.0" in system_source
+    assert "blend_alignment_losses" in system_source
     assert "if self.C(self.cfg.loss.lambda_clip) > 0.0:" in system_source
     assert "self.clip_alignment = CLIPAlignment(" in system_source
     assert "clip_weight = clip_alignment_weight(" in system_source
@@ -69,6 +86,8 @@ def test_headstudio_only_loads_clip_when_its_loss_is_enabled():
     assert "clip_global_weight: 0.0" in config_source
     assert "clip_foreground_weight: 0.0" in config_source
     assert "clip_view_weight: 0.0" in config_source
+    assert "clip_recovery_model_name: \"\"" in config_source
+    assert "clip_recovery_weight: 0.0" in config_source
     assert "clip_decay_start_step: int = 0" in system_source
     assert "clip_decay_end_step: int = 0" in system_source
     assert "lambda_trust: float = 0.0" in system_source

@@ -16,6 +16,7 @@ from threestudio.utils.ops import binary_cross_entropy, dot
 from threestudio.utils.typing import *
 from threestudio.models.clip_alignment import (
     CLIPAlignment,
+    blend_alignment_losses,
     clip_alignment_weight,
     clip_decay_weight,
     frequency_quality_loss,
@@ -75,6 +76,8 @@ class Head3DGSLKsRig(BaseLift3DSystem):
         clip_global_weight: float = 0.0
         clip_foreground_weight: float = 0.0
         clip_view_weight: float = 0.0
+        clip_recovery_model_name: str = ""
+        clip_recovery_weight: float = 0.0
         clip_decay_start_step: int = 0
         clip_decay_end_step: int = 0
         lambda_trust: float = 0.0
@@ -267,10 +270,17 @@ class Head3DGSLKsRig(BaseLift3DSystem):
         )
         self.guidance = threestudio.find(self.cfg.guidance_type)(self.cfg.guidance)
         self.clip_alignment = None
+        self.clip_recovery_alignment = None
         if self.C(self.cfg.loss.lambda_clip) > 0.0:
             self.clip_alignment = CLIPAlignment(
                 self.cfg.clip_model_name, self.cfg.prompt_processor.prompt, self.device
             )
+            if self.C(self.cfg.clip_recovery_weight) > 0.0:
+                if not self.cfg.clip_recovery_model_name:
+                    raise ValueError("clip_recovery_model_name is required when clip_recovery_weight is positive")
+                self.clip_recovery_alignment = CLIPAlignment(
+                    self.cfg.clip_recovery_model_name, self.cfg.prompt_processor.prompt, self.device
+                )
 
     def compute_temporal_losses(
             self,
@@ -398,6 +408,7 @@ class Head3DGSLKsRig(BaseLift3DSystem):
         loss_clip_global = torch.zeros((), device=images.device)
         loss_clip_foreground = torch.zeros((), device=images.device)
         loss_clip_view = torch.zeros((), device=images.device)
+        loss_clip_recovery = torch.zeros((), device=images.device)
         if clip_weight > 0.0:
             if self.clip_alignment is None:
                 raise RuntimeError("CLIP alignment was not initialized while lambda_clip is positive")
@@ -435,11 +446,44 @@ class Head3DGSLKsRig(BaseLift3DSystem):
                     foreground_only=self.cfg.clip_foreground_only,
                     view_dependent=self.cfg.clip_use_view_prompt,
                 )
+            recovery_weight = float(self.cfg.clip_recovery_weight)
+            if recovery_weight > 0.0:
+                if self.clip_recovery_alignment is None:
+                    raise RuntimeError("CLIP recovery alignment was not initialized while its weight is positive")
+                recovery_components = torch.zeros((), device=images.device)
+                if component_total > 0.0:
+                    if component_weights["global"] > 0.0:
+                        recovery_components = recovery_components + self.clip_recovery_alignment(
+                            image_chw
+                        ) * component_weights["global"]
+                    if component_weights["foreground"] > 0.0:
+                        recovery_components = recovery_components + self.clip_recovery_alignment(
+                            image_chw, opacity=out["opacity"], foreground_only=True
+                        ) * component_weights["foreground"]
+                    if component_weights["view"] > 0.0:
+                        recovery_components = recovery_components + self.clip_recovery_alignment(
+                            image_chw,
+                            opacity=out["opacity"],
+                            azimuth=batch["azimuth"],
+                            foreground_only=True,
+                            view_dependent=True,
+                        ) * component_weights["view"]
+                    loss_clip_recovery = recovery_components / component_total
+                else:
+                    loss_clip_recovery = self.clip_recovery_alignment(
+                        image_chw,
+                        opacity=out["opacity"],
+                        azimuth=batch["azimuth"],
+                        foreground_only=self.cfg.clip_foreground_only,
+                        view_dependent=self.cfg.clip_use_view_prompt,
+                    )
+                loss_clip = blend_alignment_losses(loss_clip, loss_clip_recovery, recovery_weight)
             loss = loss + loss_clip * clip_weight
         self.log("train/loss_clip", loss_clip)
         self.log("train/loss_clip_global", loss_clip_global)
         self.log("train/loss_clip_foreground", loss_clip_foreground)
         self.log("train/loss_clip_view", loss_clip_view)
+        self.log("train/loss_clip_recovery", loss_clip_recovery)
 
         quality_weight = quality_ramp_weight(
             self.C(self.cfg.lambda_frequency_quality),

@@ -93,6 +93,8 @@ system:
   clip_global_weight: 0.0
   clip_foreground_weight: 0.0
   clip_view_weight: 0.0
+  clip_recovery_model_name: ""
+  clip_recovery_weight: 0.0
   use_eye_pose: False
   use_neck_pose: False
 
