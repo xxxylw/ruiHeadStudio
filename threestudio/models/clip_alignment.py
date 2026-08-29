@@ -28,6 +28,23 @@ def clip_decay_weight(
     return base_weight * (1.0 - progress)
 
 
+def quality_ramp_weight(
+    base_weight: float,
+    global_step: int,
+    ramp_start_step: int,
+    ramp_end_step: int,
+) -> float:
+    """Linearly ramp a quality penalty after a semantic checkpoint."""
+    if base_weight <= 0.0 or ramp_end_step <= ramp_start_step:
+        return max(0.0, base_weight) if global_step >= ramp_start_step else 0.0
+    if global_step <= ramp_start_step:
+        return 0.0
+    if global_step >= ramp_end_step:
+        return base_weight
+    progress = (global_step - ramp_start_step) / float(ramp_end_step - ramp_start_step)
+    return base_weight * progress
+
+
 def normalized_parameter_drift(
     current: torch.Tensor,
     anchor: torch.Tensor,
@@ -86,6 +103,56 @@ def foreground_crop(images: torch.Tensor, opacity: torch.Tensor, padding: float 
             crop = image[:, y0:y1, x0:x1]
         crops.append(F.interpolate(crop.unsqueeze(0), size=(224, 224), mode="bicubic", align_corners=False))
     return torch.cat(crops, dim=0)
+
+
+def frequency_quality_loss(
+    images: torch.Tensor,
+    opacity: Optional[torch.Tensor] = None,
+) -> torch.Tensor:
+    """Penalize normalized high-frequency energy in rendered RGB images."""
+    if images.ndim != 4 or images.shape[1] != 3:
+        raise ValueError("images must have shape [B,3,H,W]")
+    if images.shape[-2] < 2 or images.shape[-1] < 2:
+        raise ValueError("images must be at least 2x2")
+
+    weight = torch.ones(
+        (images.shape[0], 1, images.shape[-2], images.shape[-1]),
+        dtype=images.dtype,
+        device=images.device,
+    )
+    if opacity is not None:
+        if opacity.ndim == 4 and opacity.shape[-1] == 1:
+            opacity = opacity.permute(0, 3, 1, 2)
+        elif opacity.ndim == 4 and opacity.shape[1] == 1:
+            pass
+        elif opacity.ndim == 3:
+            opacity = opacity.unsqueeze(1)
+        else:
+            raise ValueError("opacity must be [B,H,W] or [B,1,H,W]")
+        if opacity.shape[0] != images.shape[0] or opacity.shape[-2:] != images.shape[-2:]:
+            raise ValueError("images and opacity must share batch and spatial dimensions")
+        weight = 0.25 + 0.75 * opacity.detach().to(dtype=images.dtype)
+
+    def scale_loss(rgb: torch.Tensor, mask: torch.Tensor) -> torch.Tensor:
+        weighted = rgb * mask
+        intensity = weighted.abs().mean(dim=(1, 2, 3), keepdim=True).detach().clamp_min(1.0e-3)
+        tv_x = (weighted[..., :, 1:] - weighted[..., :, :-1]).abs().mean(dim=(1, 2, 3))
+        tv_y = (weighted[..., 1:, :] - weighted[..., :-1, :]).abs().mean(dim=(1, 2, 3))
+        kernel = torch.tensor(
+            [[0.0, 1.0, 0.0], [1.0, -4.0, 1.0], [0.0, 1.0, 0.0]],
+            dtype=rgb.dtype,
+            device=rgb.device,
+        ).view(1, 1, 3, 3).repeat(rgb.shape[1], 1, 1, 1)
+        padded = F.pad(weighted, (1, 1, 1, 1), mode="replicate")
+        laplacian = F.conv2d(padded, kernel, groups=rgb.shape[1])
+        lap = laplacian.abs().mean(dim=(1, 2, 3))
+        return ((tv_x + tv_y + lap) / intensity.flatten()).mean()
+
+    full = scale_loss(images, weight)
+    half_images = F.avg_pool2d(images, kernel_size=2, stride=2)
+    half_weight = F.avg_pool2d(weight, kernel_size=2, stride=2)
+    half = scale_loss(half_images, half_weight)
+    return 0.5 * (full + half)
 
 
 class CLIPAlignment:

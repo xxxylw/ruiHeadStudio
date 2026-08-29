@@ -100,6 +100,9 @@ system:
   trust_scaling_weight: 1.0
   trust_opacity_weight: 1.0
   trust_feature_weight: 0.25
+  quality_start_step: 0
+  quality_ramp_end_step: 0
+  lambda_frequency_quality: 0.0
   use_eye_pose: False
   use_neck_pose: False
 

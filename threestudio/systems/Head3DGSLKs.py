@@ -17,7 +17,9 @@ from threestudio.models.clip_alignment import (
     CLIPAlignment,
     clip_alignment_weight,
     clip_decay_weight,
+    frequency_quality_loss,
     normalized_parameter_drift,
+    quality_ramp_weight,
 )
 
 from gaussiansplatting.gaussian_renderer import render
@@ -77,6 +79,9 @@ class Head3DGSLKsRig(BaseLift3DSystem):
         trust_scaling_weight: float = 1.0
         trust_opacity_weight: float = 1.0
         trust_feature_weight: float = 0.25
+        quality_start_step: int = 0
+        quality_ramp_end_step: int = 0
+        lambda_frequency_quality: float = 0.0
         use_eye_pose: bool = False
         use_neck_pose: bool = False
 
@@ -416,6 +421,20 @@ class Head3DGSLKsRig(BaseLift3DSystem):
         self.log("train/loss_clip_global", loss_clip_global)
         self.log("train/loss_clip_foreground", loss_clip_foreground)
         self.log("train/loss_clip_view", loss_clip_view)
+
+        quality_weight = quality_ramp_weight(
+            self.C(self.cfg.lambda_frequency_quality),
+            self.true_global_step,
+            self.cfg.quality_start_step,
+            self.cfg.quality_ramp_end_step,
+        )
+        loss_frequency_quality = torch.zeros((), device=images.device)
+        if quality_weight > 0.0:
+            loss_frequency_quality = frequency_quality_loss(
+                images.permute(0, 3, 1, 2), out["opacity"]
+            )
+            loss = loss + loss_frequency_quality * quality_weight
+        self.log("train/loss_frequency_quality", loss_frequency_quality)
 
         loss_trust_xyz = torch.zeros((), device=images.device)
         loss_trust_scaling = torch.zeros((), device=images.device)
