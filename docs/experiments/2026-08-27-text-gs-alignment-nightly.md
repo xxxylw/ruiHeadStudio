@@ -396,3 +396,18 @@ To target PIQE without changing the text alignment objective, this sweep initial
 `guidance_q20` is the best current semantic/quality Pareto point: all three CLIP scores and MUSIQ exceed baseline, B/32 reaches `0.316393`, and PIQE is the lowest observed in a valid run, though still `1.520295` above baseline. Lowering guidance alone is therefore insufficient, but guidance 20 is selected as the initialization for the next quality-only tail phase.
 
 Artifacts: `outputs/text_gs_guidance_quality_sweep_20260830/dashboard/`, `scripts/launch_b32_stats_valid_sweep.sh`, and per-run `parameter_drift.json`.
+
+## q20 Reference-Statistics Quality Tail (2026-08-30)
+
+Starting from `guidance_q20`, the best guidance-calibrated point, this tail phase fixed guidance scale at `20` and B/32 recovery at `0.05`, then swept very small reference-statistics weights (`0.00005`, `0.00010`, `0.00020`) for 500 full-precision steps. The purpose was to reduce PIQE without disturbing the already strong CLIP scores.
+
+| Run | statistics weight | ViT-L/14 CLIP | ViT-B/16 CLIP | ViT-B/32 CLIP | PIQE | MUSIQ |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| HeadStudio baseline | - | 0.278400 | 0.313000 | 0.313100 | 59.930000 | 51.360000 |
+| `quality_tail_q00005` | 0.00005 | **0.288396** | **0.339480** | **0.314498** | 61.624846 | **54.6205** |
+| `quality_tail_q00010` | 0.00010 | **0.291027** | **0.338978** | **0.314965** | 62.345568 | **55.0106** |
+| `quality_tail_q00020` | 0.00020 | **0.285769** | **0.343267** | **0.318491** | 61.748085 | **55.0108** |
+
+`quality_tail_q00020` is the best current semantic point, improving every CLIP backbone and MUSIQ while reaching B/32 `0.318491`. PIQE remains the sole failing metric, so the remaining method contribution should be a direct PIQE-oriented differentiable proxy or a view-selective artifact suppression loss.
+
+Artifacts: `outputs/text_gs_quality_tail_q20_20260830/dashboard/` and `scripts/launch_b32_stats_valid_sweep.sh`.
