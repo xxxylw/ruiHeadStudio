@@ -7,8 +7,10 @@ BASE_PLY="$ROOT/outputs/text_gs_alignment_refine_alpha_20260828/refine_semantic/
 PROMPT='a DSLR portrait of Elon Musk, masterpiece, Studio Quality, 8k, ultra-HD, next generation'
 
 [[ -f "$BASE_PLY" ]] || { echo "missing initialization PLY: $BASE_PLY" >&2; exit 1; }
+set +u
 source /home/huangqirui/miniconda3/etc/profile.d/conda.sh
 conda activate ruiheadstudio
+set -u
 export HF_HUB_OFFLINE=1 DIFFUSERS_OFFLINE=1 TRANSFORMERS_OFFLINE=1
 cd "$ROOT"
 

@@ -4,8 +4,10 @@ set -euo pipefail
 ROOT=/home/huangqirui/Projects/ruiHeadStudio
 RUN_ROOT="$ROOT/outputs/text_gs_alignment_semantic_quality_sweep_20260830"
 cd "$ROOT"
+set +u
 source /home/huangqirui/miniconda3/etc/profile.d/conda.sh
 conda activate ruiheadstudio
+set -u
 export HF_HUB_OFFLINE=1 DIFFUSERS_OFFLINE=1 TRANSFORMERS_OFFLINE=1
 
 for tag in semantic_l0003 semantic_l0006 semantic_l0010; do
