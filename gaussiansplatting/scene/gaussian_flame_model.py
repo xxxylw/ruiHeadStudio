@@ -453,6 +453,7 @@ class GaussianFlameModel(GaussianModel):
         self._rotation = nn.Parameter(torch.tensor(rots, dtype=torch.float, device="cuda").requires_grad_(True))
         self._faces = torch.tensor(faces, dtype=torch.long, device="cuda")
         self.num_gs = self._xyz.shape[0]
+        self.max_radii2D = torch.zeros((self.num_gs), device="cuda")
 
         try:
             shape_names = [p.name for p in plydata.elements[1].properties if p.name.startswith("shape")]

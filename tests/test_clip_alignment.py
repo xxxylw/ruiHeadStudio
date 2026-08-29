@@ -107,6 +107,13 @@ def test_headstudio_only_loads_clip_when_its_loss_is_enabled():
     assert "lambda_clip: 0.0" in config_source
 
 
+def test_gaussian_ply_reload_resets_pointwise_optimizer_buffers():
+    source = (ROOT / "gaussiansplatting/scene/gaussian_flame_model.py").read_text(encoding="utf-8")
+    load_source = source.split("def load_ply", 1)[1].split("def training_setup", 1)[0]
+
+    assert "self.max_radii2D = torch.zeros((self.num_gs), device=\"cuda\")" in load_source
+
+
 def test_clip_decay_weight_has_stable_linear_window():
     assert clip_decay_weight(0.006, 7000, 7000, 8000) == pytest.approx(0.006)
     assert clip_decay_weight(0.006, 7500, 7000, 8000) == pytest.approx(0.003)
