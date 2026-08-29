@@ -304,3 +304,18 @@ The teacher preserves the large CLIP and B/16 gains, but it copies the checkpoin
 `statistics_q006` is the best quality-oriented point (PIQE 61.034154, MUSIQ 54.442806); `statistics_q001` is a slightly stronger CLIP/B16 tradeoff. All three improve ViT-L/14, ViT-B/16, and MUSIQ, but all remain below the ViT-B/32 baseline and above the PIQE baseline, so the full five-metric gate remains open. This is preferable to a rendered RGB teacher because it does not directly copy checkpoint artifacts, but the frozen statistics teacher alone is insufficient for no-reference quality. The next direction is a learned quality proxy or multi-scale perceptual teacher, paired with explicit B/32 recovery.
 
 Artifacts: `outputs/text_gs_reference_statistics_sweep_20260830/dashboard/`, `scripts/launch_reference_statistics_sweep.sh`, and `scripts/evaluate_reference_statistics_sweep.sh`.
+
+## ViT-B/32 Recovery Teacher Fast Continuation (2026-08-30)
+
+The original dual-teacher continuation was computationally too slow, so its three intermediate checkpoints were preserved and used as initialization for a 600-step fast continuation. This version kept the frozen ViT-L/14 primary teacher and ViT-B/32 recovery teacher, but restricted both to the global render branch. The recovery blend weights were `0.15`, `0.30`, and `0.45`; the frozen reference-statistics teacher remained at `0.001`.
+
+| Run | recovery blend | ViT-L/14 CLIP | ViT-B/16 CLIP | ViT-B/32 CLIP | PIQE | MUSIQ |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| HeadStudio baseline | - | 0.278400 | 0.313000 | 0.313100 | 59.930000 | 51.360000 |
+| `recovery_fast_q015` | 0.15 | **0.288185** | **0.343947** | 0.305845 | 62.075521 | **53.793602** |
+| `recovery_fast_q030` | 0.30 | 0.289464 | **0.331806** | 0.299432 | 63.570331 | **53.150425** |
+| `recovery_fast_q045` | 0.45 | **0.289364** | **0.340412** | 0.304893 | 61.925814 | **54.776586** |
+
+The fast continuation confirms that B/32 recovery is not enough by itself: all three runs remain below the B/32 baseline and above the PIQE baseline, although they improve L/14, B/16, and MUSIQ. `recovery_fast_q045` is the best MUSIQ point, while `recovery_fast_q015` is the strongest B/16 point. The full five-metric gate therefore remains open. The result rules out simply increasing B/32 loss weight as the quality solution; the next experiment should use a learned no-reference quality proxy or multi-scale perceptual teacher and explicitly calibrate all three CLIP backbones.
+
+Artifacts: `outputs/text_gs_b32_recovery_fast_sweep_20260830/dashboard/`, `scripts/launch_b32_recovery_fast_sweep.sh`, `scripts/evaluate_b32_recovery_fast_sweep.sh`, and `scripts/dashboard_b32_recovery_fast_after_eval.sh`.
