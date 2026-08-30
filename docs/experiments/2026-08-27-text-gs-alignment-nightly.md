@@ -411,3 +411,18 @@ Starting from `guidance_q20`, the best guidance-calibrated point, this tail phas
 `quality_tail_q00020` is the best current semantic point, improving every CLIP backbone and MUSIQ while reaching B/32 `0.318491`. PIQE remains the sole failing metric, so the remaining method contribution should be a direct PIQE-oriented differentiable proxy or a view-selective artifact suppression loss.
 
 Artifacts: `outputs/text_gs_quality_tail_q20_20260830/dashboard/` and `scripts/launch_b32_stats_valid_sweep.sh`.
+
+## Edge-Aware Artifact Suppression Sweep (2026-08-30)
+
+To address the remaining PIQE gap, this sweep adds a differentiable no-reference quality proxy. It penalizes high-frequency luminance residuals in locally flat rendered regions while attenuating the penalty near image edges, and uses the current render opacity as a foreground weight. The loss is ramped with the existing quality schedule so early text alignment remains dominant. All runs initialized from `quality_tail_q00020`, used guidance scale `20`, ViT-B/32 recovery `0.05`, full precision, 500 continuation steps from logical step 7000, and verified non-zero parameter drift.
+
+| Run | artifact weight | ViT-L/14 CLIP | ViT-B/16 CLIP | ViT-B/32 CLIP | PIQE | MUSIQ |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| HeadStudio baseline | - | 0.278400 | 0.313000 | 0.313100 | 59.930000 | 51.360000 |
+| `artifact_q0001` | 0.0001 | **0.287502** | **0.338545** | **0.317347** | 60.425517 | **55.8754** |
+| `artifact_q0003` | 0.0003 | **0.285901** | **0.341617** | **0.318511** | 62.730646 | **54.8853** |
+| `artifact_q0006` | 0.0006 | **0.290199** | **0.341607** | **0.313116** | **59.550065** | **55.6317** |
+
+`artifact_q0006` is the first valid candidate to pass all five supplied gates: all three CLIP metrics and MUSIQ improve over HeadStudio, while PIQE decreases from `59.93` to `59.5501`. The B/32 margin is very small (`+0.000016`), so this point should be repeated with an additional seed before treating it as a robust result. The lower-weight `artifact_q0001` gives the strongest MUSIQ and a better semantic/quality balance, while `artifact_q0006` is the current gate-passing point.
+
+Artifacts: `outputs/text_gs_artifact_quality_sweep_20260830/dashboard/`, `threestudio/models/clip_alignment.py`, `threestudio/systems/Head3DGSLKs.py`, and per-run `parameter_drift.json`.
