@@ -390,7 +390,7 @@ class Head3DGSLKsRig(BaseLift3DSystem):
 
         guidance_out = self.guidance(
             images.permute(0, 3, 1, 2), control_images, prompt_utils,
-            **batch, rgb_as_latents=False,
+            opacity=out["opacity"], **batch, rgb_as_latents=False,
         )
 
         loss = 0.0
