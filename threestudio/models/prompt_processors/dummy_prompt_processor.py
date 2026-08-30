@@ -22,3 +22,6 @@ class DummyPromptProcessor(PromptProcessor):
         # legacy Stable Diffusion text-embedding cache entries.
         self.prompt = self.preprocess_prompt(self.cfg.prompt)
         self.negative_prompt = self.cfg.negative_prompt
+
+    def __call__(self):
+        return self
