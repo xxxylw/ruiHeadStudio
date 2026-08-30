@@ -16,3 +16,9 @@ class DummyPromptProcessor(PromptProcessor):
         prompt: str = ""
 
     cfg: Config
+
+    def configure(self) -> None:
+        # FLUX reference guidance only needs the prompt string; avoid creating
+        # legacy Stable Diffusion text-embedding cache entries.
+        self.prompt = self.preprocess_prompt(self.cfg.prompt)
+        self.negative_prompt = self.cfg.negative_prompt
