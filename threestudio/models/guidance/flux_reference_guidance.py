@@ -104,6 +104,7 @@ try:
             reference_cache_dir: str = "./outputs/flux_references"
             reference_weight: float = 1.0
             edge_weight: float = 0.1
+            reference_resolution: int = 512
             num_inference_steps: int = 4
             min_step_percent: float = 0.0
             max_step_percent: float = 1.0
@@ -138,12 +139,14 @@ try:
                     self.cfg.prompt,
                     float(azi.detach().cpu()),
                     float(ele.detach().cpu()),
-                    rgb.shape[-2],
-                    rgb.shape[-1],
+                    self.cfg.reference_resolution,
+                    self.cfg.reference_resolution,
                 )
                 for ele, azi in zip(elevation, azimuth)
             ]
             reference = torch.cat(refs, dim=0).to(device=rgb.device, dtype=rgb.dtype)
+            if reference.shape[-2:] != rgb.shape[-2:]:
+                reference = F.interpolate(reference, size=rgb.shape[-2:], mode="bilinear", align_corners=False)
             loss = flux_reference_loss(rgb, reference, kwargs.get("opacity"))
             return {"loss_sds": loss * self.cfg.reference_weight, "grad_norm": loss.detach().sqrt()}
 except ImportError:

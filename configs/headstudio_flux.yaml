@@ -105,6 +105,7 @@ system:
     prompt: "${system.prompt_processor.prompt}"
     reference_cache_dir: "${exp_root_dir}/${tag}/flux_references"
     reference_weight: 1.0
+    reference_resolution: 512
     num_inference_steps: 4
 
   prompt_processor_type: "dummy-prompt-processor"

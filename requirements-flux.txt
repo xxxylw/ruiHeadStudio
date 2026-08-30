@@ -1,5 +1,6 @@
 # Optional dependencies for the FLUX reference-teacher backend.
 # Keep the legacy ruiheadstudio environment unchanged until the probe passes.
 diffusers>=0.30.0
-transformers>=4.44.0
+transformers==4.44.2
+tokenizers==0.19.1
 sentencepiece>=0.2.0
