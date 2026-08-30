@@ -25,7 +25,8 @@ def flux_reference_loss(
         raise ValueError("image and reference must be BCHW")
     if image.shape != reference.shape:
         raise ValueError("image and reference must have the same shape")
-    diff = torch.sqrt((image - reference.detach()).square() + 1.0e-6)
+    diff = torch.sqrt((image - reference.detach()).square() + 1.0e-6) - 1.0e-3
+    diff = diff.clamp_min(0.0)
     if opacity is not None:
         if opacity.ndim == 4 and opacity.shape[-1] == 1:
             opacity = opacity.permute(0, 3, 1, 2)
