@@ -47,8 +47,15 @@ def flux_reference_loss(
     return diff.mean() / normalizer + 0.1 * edge_loss
 
 
-def reference_cache_key(prompt: str, azimuth: float, elevation: float) -> str:
-    value = f"{prompt}|{azimuth:.2f}|{elevation:.2f}"
+def reference_cache_key(
+    prompt: str, azimuth: float, elevation: float, angle_bin: float = 30.0
+) -> str:
+    """Quantize camera angles so random 3DGS views reuse a finite FLUX bank."""
+    if angle_bin <= 0:
+        raise ValueError("angle_bin must be positive")
+    quantized_azimuth = round(azimuth / angle_bin) * angle_bin
+    quantized_elevation = round(elevation / angle_bin) * angle_bin
+    value = f"{prompt}|{quantized_azimuth:.2f}|{quantized_elevation:.2f}"
     return hashlib.sha1(value.encode("utf-8")).hexdigest()[:16]
 
 
@@ -193,6 +200,7 @@ try:
             edge_weight: float = 0.1
             reference_resolution: int = 512
             num_inference_steps: int = 4
+            reference_angle_bin: float = 30.0
             min_step_percent: float = 0.0
             max_step_percent: float = 1.0
 
@@ -209,7 +217,9 @@ try:
             self.reference_cache.mkdir(parents=True, exist_ok=True)
 
         def _reference(self, prompt: str, azimuth: float, elevation: float, height: int, width: int):
-            key = reference_cache_key(prompt, azimuth, elevation)
+            key = reference_cache_key(
+                prompt, azimuth, elevation, self.cfg.reference_angle_bin
+            )
             path = self.reference_cache / f"{key}.pt"
             if path.exists():
                 return torch.load(path, map_location=self.device, weights_only=True)
