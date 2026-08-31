@@ -34,3 +34,20 @@ def test_flux_reference_loss_is_zero_for_identical_images_and_has_gradients():
 def test_flux_reference_loss_rejects_invalid_shapes():
     with pytest.raises(ValueError, match="BCHW"):
         FLUX.flux_reference_loss(torch.zeros((3, 8, 8)), torch.zeros((1, 3, 8, 8)))
+
+
+def test_backend_uses_single_file_strategy_when_checkpoint_exists(tmp_path):
+    checkpoint = tmp_path / "flux1-schnell.safetensors"
+    checkpoint.write_bytes(b"placeholder")
+    backend = FLUX.FluxReferenceBackend("repo", "cpu", single_file_path=str(checkpoint))
+    assert backend._load_strategy() == "single_file"
+
+
+def test_backend_falls_back_to_pipeline_when_checkpoint_missing(tmp_path):
+    backend = FLUX.FluxReferenceBackend("repo", "cpu", single_file_path=str(tmp_path / "missing.safetensors"))
+    assert backend._load_strategy() == "pipeline"
+
+
+def test_backend_falls_back_to_pipeline_without_single_file_path():
+    backend = FLUX.FluxReferenceBackend("repo", "cpu")
+    assert backend._load_strategy() == "pipeline"

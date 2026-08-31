@@ -1,4 +1,5 @@
 import hashlib
+import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, Optional
@@ -54,13 +55,41 @@ def reference_cache_key(prompt: str, azimuth: float, elevation: float) -> str:
 class FluxReferenceBackend:
     """Lazy FLUX image teacher. The optional diffusers dependency is imported only when enabled."""
 
-    def __init__(self, model_name: str, device: str, cache_dir: Optional[str] = None):
+    def __init__(
+        self,
+        model_name: str,
+        device: str,
+        cache_dir: Optional[str] = None,
+        single_file_path: Optional[str] = None,
+    ):
         self.model_name = model_name
         self.device = device
         self.cache_dir = Path(cache_dir).expanduser() if cache_dir else None
+        self.single_file_path = Path(single_file_path).expanduser() if single_file_path else None
         self.pipe = None
 
+    def _load_strategy(self) -> str:
+        """Choose the weight source: "single_file" for the monolithic checkpoint, else the diffusers pipeline."""
+        if self.single_file_path is not None and self.single_file_path.is_file():
+            return "single_file"
+        return "pipeline"
+
     def _load(self):
+        if self._load_strategy() == "single_file":
+            self.pipe = self._build_single_file_pipe()
+        else:
+            self.pipe = self._build_pipeline()
+        if hasattr(self.pipe, "enable_sequential_cpu_offload"):
+            # FLUX transformer + T5 exceed a 24 GiB card when whole modules
+            # are moved at once; sequential offload keeps the smoke/training
+            # path usable on the available RTX 3090 GPUs.
+            self.pipe.enable_sequential_cpu_offload()
+        elif hasattr(self.pipe, "enable_model_cpu_offload"):
+            self.pipe.enable_model_cpu_offload()
+        else:
+            self.pipe.to(self.device)
+
+    def _build_pipeline(self):
         try:
             from diffusers import DiffusionPipeline
         except ImportError as exc:
@@ -68,15 +97,67 @@ class FluxReferenceBackend:
                 "FLUX guidance requires a recent diffusers installation; "
                 "the legacy SD-only environment is not sufficient"
             ) from exc
-        self.pipe = DiffusionPipeline.from_pretrained(
+        return DiffusionPipeline.from_pretrained(
             self.model_name,
             torch_dtype=torch.bfloat16,
             cache_dir=str(self.cache_dir) if self.cache_dir else None,
+            local_files_only=True,
         )
-        if hasattr(self.pipe, "enable_model_cpu_offload"):
-            self.pipe.enable_model_cpu_offload()
-        else:
-            self.pipe.to(self.device)
+
+    def _build_single_file_pipe(self):
+        """Build the FLUX pipeline from the monolithic transformer checkpoint plus a slim local diffusers repo."""
+        try:
+            from diffusers import (
+                AutoencoderKL,
+                FlowMatchEulerDiscreteScheduler,
+                FluxPipeline,
+                FluxTransformer2DModel,
+            )
+            from transformers import (
+                CLIPTextModel,
+                CLIPTokenizer,
+                T5EncoderModel,
+                T5TokenizerFast,
+            )
+        except ImportError as exc:
+            raise RuntimeError(
+                "FLUX guidance requires a recent diffusers installation; "
+                "the legacy SD-only environment is not sufficient"
+            ) from exc
+        transformer = FluxTransformer2DModel.from_single_file(
+            str(self.single_file_path),
+            config=str(self.model_name),
+            subfolder="transformer",
+            torch_dtype=torch.bfloat16,
+        )
+        return FluxPipeline(
+            scheduler=FlowMatchEulerDiscreteScheduler.from_pretrained(
+                self.model_name, subfolder="scheduler", local_files_only=True
+            ),
+            text_encoder=CLIPTextModel.from_pretrained(
+                self.model_name, subfolder="text_encoder", torch_dtype=torch.bfloat16, local_files_only=True
+            ),
+            tokenizer=CLIPTokenizer.from_pretrained(
+                self.model_name, subfolder="tokenizer", local_files_only=True
+            ),
+            text_encoder_2=T5EncoderModel.from_pretrained(
+                self.model_name, subfolder="text_encoder_2", torch_dtype=torch.bfloat16, local_files_only=True
+            ),
+            tokenizer_2=T5TokenizerFast.from_pretrained(
+                self.model_name,
+                subfolder="tokenizer_2",
+                local_files_only=True,
+                # FLUX.1-schnell ships only tokenizer.json (no spiece.model);
+                # the config's add_prefix_space=True would force a slow
+                # conversion (from_slow) that then fails. The fast tokenizer
+                # already encodes the prefix space (Metaspace prepend_scheme).
+                add_prefix_space=None,
+            ),
+            vae=AutoencoderKL.from_pretrained(
+                self.model_name, subfolder="vae", torch_dtype=torch.bfloat16, local_files_only=True
+            ),
+            transformer=transformer,
+        )
 
     @torch.no_grad()
     def generate(self, prompt: str, height: int = 512, width: int = 512, steps: int = 4) -> torch.Tensor:
@@ -89,6 +170,10 @@ class FluxReferenceBackend:
 
 
 try:
+    if os.environ.get("FLUX_SKIP_THREESTUDIO") == "1":
+        # Standalone tests/smoke never need the threestudio registration; skip
+        # the heavy plugin-tree import (diffusers/transformers/scipy) there.
+        raise ImportError("threestudio skipped by FLUX_SKIP_THREESTUDIO=1")
     import threestudio
     from threestudio.utils.base import BaseObject
     from threestudio.utils.typing import *
@@ -100,6 +185,7 @@ try:
         @dataclass
         class Config(BaseObject.Config):
             model_name_or_path: str = "black-forest-labs/FLUX.1-schnell"
+            single_file_path: Optional[str] = None
             prompt: str = "a realistic studio portrait of a 3D head avatar"
             cache_dir: Optional[str] = None
             reference_cache_dir: str = "./outputs/flux_references"
@@ -114,7 +200,10 @@ try:
 
         def configure(self) -> None:
             self.backend = FluxReferenceBackend(
-                self.cfg.model_name_or_path, str(self.device), self.cfg.cache_dir
+                self.cfg.model_name_or_path,
+                str(self.device),
+                self.cfg.cache_dir,
+                self.cfg.single_file_path,
             )
             self.reference_cache = Path(self.cfg.reference_cache_dir).expanduser()
             self.reference_cache.mkdir(parents=True, exist_ok=True)
