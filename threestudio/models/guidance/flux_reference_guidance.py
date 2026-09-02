@@ -216,6 +216,10 @@ try:
             self.reference_cache = Path(self.cfg.reference_cache_dir).expanduser()
             self.reference_cache.mkdir(parents=True, exist_ok=True)
 
+        def set_min_max_steps(self, min_step_percent=0.02, max_step_percent=0.98):
+            self.min_step_percent = float(min_step_percent)
+            self.max_step_percent = float(max_step_percent)
+
         def _reference(self, prompt: str, azimuth: float, elevation: float, height: int, width: int):
             key = reference_cache_key(
                 prompt, azimuth, elevation, self.cfg.reference_angle_bin
