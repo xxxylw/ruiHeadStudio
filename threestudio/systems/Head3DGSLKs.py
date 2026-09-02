@@ -956,19 +956,43 @@ class Head3DGSLKsRig(BaseLift3DSystem):
         return ret
 
     def on_train_end(self) -> None:
-        if hasattr(self, "_initial_gaussian_xyz"):
-            drift = (self.gaussian._xyz.detach() - self._initial_gaussian_xyz).abs()
+        if not hasattr(self, "_initial_gaussian_xyz"):
+            return
+        # Densification/pruning changes the gaussian count, so a per-point
+        # drift against the initial cloud is only comparable on the common
+        # prefix. Record counts and mode; never block end-of-training here.
+        try:
+            initial_xyz = self._initial_gaussian_xyz
+            final_xyz = self.gaussian._xyz.detach()
+            initial_point_count = int(initial_xyz.shape[0])
+            final_point_count = int(final_xyz.shape[0])
+            prefix = min(initial_point_count, final_point_count)
+            if prefix > 0:
+                drift = (final_xyz[:prefix] - initial_xyz[:prefix]).abs()
+                max_abs_xyz_drift = float(drift.max().item())
+                mean_abs_xyz_drift = float(drift.mean().item())
+                drift_compare_mode = (
+                    "full" if initial_point_count == final_point_count else "prefix"
+                )
+            else:
+                max_abs_xyz_drift = None
+                mean_abs_xyz_drift = None
+                drift_compare_mode = "empty"
             with open(self.get_save_path("parameter_drift.json"), "w") as handle:
                 json.dump(
                     {
-                        "initial_point_count": int(self._initial_gaussian_xyz.shape[0]),
-                        "final_point_count": int(self.gaussian._xyz.shape[0]),
-                        "max_abs_xyz_drift": float(drift.max().item()),
-                        "mean_abs_xyz_drift": float(drift.mean().item()),
+                        "initial_point_count": initial_point_count,
+                        "final_point_count": final_point_count,
+                        "compared_point_count": prefix,
+                        "drift_compare_mode": drift_compare_mode,
+                        "max_abs_xyz_drift": max_abs_xyz_drift,
+                        "mean_abs_xyz_drift": mean_abs_xyz_drift,
                     },
                     handle,
                     indent=2,
                 )
+        except Exception as exc:  # record stats best-effort only
+            threestudio.warn("failed to record parameter drift at on_train_end: %s" % exc)
 
     def guidance_evaluation_save(self, comp_rgb, guidance_eval_out):
         B, size = comp_rgb.shape[:2]
