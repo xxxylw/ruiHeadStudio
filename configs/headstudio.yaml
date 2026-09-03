@@ -6,7 +6,7 @@ seed: 0
 #data_type: "random-camera-w-cond-datamodule"
 data_type: "random-camera-exp-datamodule"
 data:
-  batch_size: 8
+  batch_size: 4
   eval_camera_distance: 2.0
   camera_distance_range: [ 1.5, 2.0 ]
   light_sample_strategy: "dreamfusion3dgs"
@@ -37,8 +37,26 @@ data:
 
   gender: 'generic'
   training_w_animation: True
+  temporal_window_enabled: true
+  temporal_window_length: 2
+  temporal_window_stride: 1
+  temporal_primary_index: 0
+  temporal_same_camera: true
   flame_path: "./ckpts/FLAME-2000"
-  talkshow_train_path: './talkshow/collection/chemistry/2nd_Order_Rate_Laws-6BZb96mqmbg__68891-00_01_40-00_01_46_exp.npy'
+  talkshow_train_path: './collection/ruiheadstudio/flame_collections/talkshow/project_converted_exp.npy'
+  train_pose_inputs:
+    - './collection/ruiheadstudio/flame_collections/talkshow/project_converted_exp.npy'
+    - './collection/ruiheadstudio/flame_collections/talkshow/synthetic_aug'
+    - './collection/ruiheadstudio/flame_collections/talkvid/per_clip'
+  train_pose_group_labels:
+    - 'talkshow'
+    - 'synthetic_aug'
+    - 'talkvid'
+  train_pose_group_weights:
+    talkshow: 0.34
+    synthetic_aug: 0.33
+    talkvid: 0.33
+  source_sampling_mode: 'uniform'
   talkshow_val_path: './talkshow/ExpressiveWholeBodyDatasetReleaseV1.0/chemistry/2nd_Order_Rate_Laws-6BZb96mqmbg.mp4/68891-00_01_40-00_01_46/68891-00_01_40-00_01_46.pkl'
 
 system_type: "head-3dgs-lks-rig-system"
@@ -61,10 +79,25 @@ system:
   prune_size_threshold: 0.002
   half_scheduler_max_step: 3000
   size_threshold_fix_step: 1500
+  surface_constraint_start_step: 2400
+  temporal_loss_start_step: 2400
+  scale_ratio_threshold: 0.5
   apose: true
   bg_white: False
   area_relax: False
   training_w_animation: ${data.training_w_animation}
+  clip_model_name: "ViT-L/14"
+  clip_start_step: 2000
+  clip_foreground_only: False
+  clip_use_view_prompt: False
+  clip_global_weight: 0.0
+  clip_foreground_weight: 0.0
+  clip_view_weight: 0.0
+  clip_recovery_model_name: ""
+  clip_recovery_weight: 0.0
+  lambda_artifact_suppression: 0.0
+  use_eye_pose: False
+  use_neck_pose: False
 
   guidance_type: "controlnet-depth-guidance"
   guidance:
@@ -93,9 +126,19 @@ system:
     lambda_sds: 1.
     lambda_sparsity: 1.
     lambda_opaque: 0.0
-    lambda_position: 10.0
+    lambda_position: 0.0
     lambda_scaling: 10.0
+    lambda_local_position: 5.0
+    lambda_barycentric_inside: 1.0
+    lambda_normal_offset: 0.5
+    lambda_scale_ratio: 5.0
+    lambda_temporal_motion: 0.1
+    lambda_temporal_scale_ratio: 0.0
+    lambda_temporal_local_offset: 0.0
+    lambda_temporal_local_offset_accel: 0.0
+    lambda_temporal_scale_ratio_accel: 0.1
     lambda_shape: 0.0
+    lambda_clip: 0.0
   optimizer:
     name: Adam
     args:

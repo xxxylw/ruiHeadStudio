@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="322" viewBox="0 0 900 322">
+<rect width="100%" height="100%" fill="#ffffff"/>
+<text x="24" y="32" font-family="Arial" font-size="20" font-weight="700">CLIP metrics vs HeadStudio baseline</text>
+<text x="24" y="78" font-family="Arial" font-size="12">artifact_q0001 / ViT-L/14 CLIP</text>
+<rect x="220" y="62" width="471" height="16" fill="#2f6fed" rx="2"/>
+<line x1="676" y1="59" x2="676" y2="82" stroke="#111" stroke-width="1"/>
+<text x="699" y="75" font-family="Arial" font-size="12">0.2875</text>
+<text x="24" y="106" font-family="Arial" font-size="12">artifact_q0001 / ViT-B/16 CLIP</text>
+<rect x="220" y="90" width="554" height="16" fill="#2f6fed" rx="2"/>
+<line x1="733" y1="87" x2="733" y2="110" stroke="#111" stroke-width="1"/>
+<text x="782" y="103" font-family="Arial" font-size="12">0.3385</text>
+<text x="24" y="134" font-family="Arial" font-size="12">artifact_q0001 / ViT-B/32 CLIP</text>
+<rect x="220" y="118" width="520" height="16" fill="#2f6fed" rx="2"/>
+<line x1="733" y1="115" x2="733" y2="138" stroke="#111" stroke-width="1"/>
+<text x="748" y="131" font-family="Arial" font-size="12">0.3173</text>
+<text x="24" y="162" font-family="Arial" font-size="12">artifact_q0003 / ViT-L/14 CLIP</text>
+<rect x="220" y="146" width="468" height="16" fill="#2f6fed" rx="2"/>
+<line x1="676" y1="143" x2="676" y2="166" stroke="#111" stroke-width="1"/>
+<text x="696" y="159" font-family="Arial" font-size="12">0.2859</text>
+<text x="24" y="190" font-family="Arial" font-size="12">artifact_q0003 / ViT-B/16 CLIP</text>
+<rect x="220" y="174" width="560" height="16" fill="#2f6fed" rx="2"/>
+<line x1="733" y1="171" x2="733" y2="194" stroke="#111" stroke-width="1"/>
+<text x="788" y="187" font-family="Arial" font-size="12">0.3416</text>
+<text x="24" y="218" font-family="Arial" font-size="12">artifact_q0003 / ViT-B/32 CLIP</text>
+<rect x="220" y="202" width="522" height="16" fill="#2f6fed" rx="2"/>
+<line x1="733" y1="199" x2="733" y2="222" stroke="#111" stroke-width="1"/>
+<text x="750" y="215" font-family="Arial" font-size="12">0.3185</text>
+<text x="24" y="246" font-family="Arial" font-size="12">artifact_q0006 / ViT-L/14 CLIP</text>
+<rect x="220" y="230" width="475" height="16" fill="#2f6fed" rx="2"/>
+<line x1="676" y1="227" x2="676" y2="250" stroke="#111" stroke-width="1"/>
+<text x="703" y="243" font-family="Arial" font-size="12">0.2902</text>
+<text x="24" y="274" font-family="Arial" font-size="12">artifact_q0006 / ViT-B/16 CLIP</text>
+<rect x="220" y="258" width="559" height="16" fill="#2f6fed" rx="2"/>
+<line x1="733" y1="255" x2="733" y2="278" stroke="#111" stroke-width="1"/>
+<text x="787" y="271" font-family="Arial" font-size="12">0.3416</text>
+<text x="24" y="302" font-family="Arial" font-size="12">artifact_q0006 / ViT-B/32 CLIP</text>
+<rect x="220" y="286" width="513" height="16" fill="#2f6fed" rx="2"/>
+<line x1="733" y1="283" x2="733" y2="306" stroke="#111" stroke-width="1"/>
+<text x="741" y="299" font-family="Arial" font-size="12">0.3131</text>
+</svg>

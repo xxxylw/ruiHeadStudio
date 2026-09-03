@@ -25,6 +25,8 @@ from threestudio.utils.head_v2 import FlamePointswRandomExp
 import os
 import numpy as np
 import pickle
+import sys
+from pathlib import Path
 
 
 @dataclass
@@ -83,6 +85,10 @@ class RandomCameraDataModuleConfig:
     num_workers: int = 0
     talkshow_train_path: str = "path/to/talkshow_train"
     talkshow_val_path: str = "path/to/talkshow_val"
+    train_pose_inputs: List[str] = field(default_factory=list)
+    train_pose_group_labels: List[str] = field(default_factory=list)
+    train_pose_group_weights: Dict[str, float] = field(default_factory=dict)
+    source_sampling_mode: str = "uniform"
 
     is_lmk: bool = True
     is_mediapipe: bool = True
@@ -90,6 +96,237 @@ class RandomCameraDataModuleConfig:
     control_type: str = "mediapipe"
 
     training_w_animation: bool = True
+    temporal_window_enabled: bool = False
+    temporal_window_length: int = 2
+    temporal_window_stride: int = 1
+    temporal_primary_index: int = 0
+    temporal_same_camera: bool = True
+
+
+@dataclass(frozen=True)
+class PoseInputSpec:
+    input_path: str
+    group_label: str
+    source_name: str
+
+
+@dataclass
+class PoseSource:
+    group_label: str
+    source_name: str
+    sequences: List[Dict[str, np.ndarray]]
+
+
+def create_pose_source_cursors(sources: List[PoseSource]) -> List[Dict[str, int]]:
+    return [{"sequence_index": 0, "frame_index": 0} for _ in sources]
+
+
+def _sequence_frame_count(sequence: Dict[str, np.ndarray]) -> int:
+    return int(sequence["expression"].shape[0])
+
+
+def sample_pose_window_from_source(
+    sources: List[PoseSource],
+    cursors: List[Dict[str, int]],
+    source_index: int,
+    window_length: int,
+    window_stride: int = 1,
+) -> Dict[str, object]:
+    if window_length <= 0:
+        raise ValueError(f"window_length must be positive: {window_length}")
+    if window_stride <= 0:
+        raise ValueError(f"window_stride must be positive: {window_stride}")
+
+    source = sources[source_index]
+    cursor = cursors[source_index]
+    num_sequences = len(source.sequences)
+
+    for _ in range(num_sequences + 1):
+        sequence_index = cursor["sequence_index"]
+        sequence = source.sequences[sequence_index]
+        frame_count = _sequence_frame_count(sequence)
+
+        if frame_count >= window_length:
+            max_start = frame_count - window_length
+            if cursor["frame_index"] <= max_start:
+                start = cursor["frame_index"]
+                frame_indices = list(range(start, start + window_length))
+                cursor["frame_index"] += window_stride
+                return {
+                    "group_label": source.group_label,
+                    "source_name": source.source_name,
+                    "source_index": source_index,
+                    "sequence_index": sequence_index,
+                    "frame_indices": frame_indices,
+                    "sequence": sequence,
+                }
+
+        cursor["sequence_index"] = (sequence_index + 1) % num_sequences
+        cursor["frame_index"] = 0
+
+    raise ValueError(
+        f"Pose source {source.source_name} has no sequence with at least {window_length} frames"
+    )
+
+
+@dataclass
+class PoseTrainingCorpus:
+    group_names: List[str]
+    group_probs: np.ndarray
+    group_to_source_indices: Dict[str, List[int]]
+    source_probs_by_group: Dict[str, np.ndarray]
+    sources: List[PoseSource]
+    source_sequence_counts: List[int]
+
+
+def normalize_train_pose_inputs(cfg_like: Any) -> Dict[str, List[str]]:
+    if isinstance(cfg_like, dict):
+        train_pose_inputs = list(cfg_like.get("train_pose_inputs", []) or [])
+        train_pose_group_labels = list(cfg_like.get("train_pose_group_labels", []) or [])
+        legacy_path = cfg_like.get("talkshow_train_path")
+    else:
+        train_pose_inputs = list(getattr(cfg_like, "train_pose_inputs", []) or [])
+        train_pose_group_labels = list(getattr(cfg_like, "train_pose_group_labels", []) or [])
+        legacy_path = getattr(cfg_like, "talkshow_train_path", None)
+
+    if not train_pose_inputs:
+        if not legacy_path:
+            raise ValueError("No training pose inputs configured.")
+        train_pose_inputs = [legacy_path]
+        train_pose_group_labels = ["talkshow"]
+
+    if train_pose_group_labels and len(train_pose_group_labels) != len(train_pose_inputs):
+        raise ValueError("train_pose_group_labels must match train_pose_inputs length.")
+
+    if not train_pose_group_labels:
+        train_pose_group_labels = [Path(path).stem for path in train_pose_inputs]
+
+    return {
+        "paths": train_pose_inputs,
+        "group_labels": train_pose_group_labels,
+    }
+
+
+def expand_pose_input_specs(paths: List[str], group_labels: List[str]) -> List[PoseInputSpec]:
+    specs: List[PoseInputSpec] = []
+    for input_path, group_label in zip(paths, group_labels):
+        path = Path(input_path)
+        if path.is_dir():
+            children = sorted(child for child in path.glob("*.npy") if child.is_file())
+            if not children:
+                raise FileNotFoundError(f"No .npy files found in directory: {path}")
+            for child in children:
+                specs.append(PoseInputSpec(str(child), group_label, child.stem))
+        elif path.is_file():
+            specs.append(PoseInputSpec(str(path), group_label, path.stem))
+        else:
+            raise FileNotFoundError(path)
+    return specs
+
+
+def load_pose_sequences(input_path: str) -> List[Dict[str, Any]]:
+    added_modules = []
+    if "numpy._core" not in sys.modules:
+        sys.modules["numpy._core"] = np.core
+        added_modules.append("numpy._core")
+    if "numpy._core.multiarray" not in sys.modules:
+        sys.modules["numpy._core.multiarray"] = np.core.multiarray
+        added_modules.append("numpy._core.multiarray")
+    try:
+        return list(np.load(input_path, allow_pickle=True).tolist())
+    finally:
+        for module_name in added_modules:
+            sys.modules.pop(module_name, None)
+
+
+def build_pose_training_corpus(
+    specs: List[PoseInputSpec],
+    group_weights: Dict[str, float],
+    source_sampling_mode: str,
+) -> PoseTrainingCorpus:
+    sources: List[PoseSource] = []
+    group_to_source_indices: Dict[str, List[int]] = {}
+
+    for spec in specs:
+        sequences = load_pose_sequences(spec.input_path)
+        source_index = len(sources)
+        sources.append(
+            PoseSource(
+                group_label=spec.group_label,
+                source_name=spec.source_name,
+                sequences=sequences,
+            )
+        )
+        group_to_source_indices.setdefault(spec.group_label, []).append(source_index)
+
+    group_names = sorted(group_to_source_indices.keys())
+    raw_group_probs = np.array([group_weights.get(name, 1.0) for name in group_names], dtype=np.float64)
+    group_probs = raw_group_probs / raw_group_probs.sum()
+
+    source_sequence_counts = [len(source.sequences) for source in sources]
+    source_probs_by_group: Dict[str, np.ndarray] = {}
+    for group_name, indices in group_to_source_indices.items():
+        if source_sampling_mode == "uniform":
+            weights = np.ones(len(indices), dtype=np.float64)
+        elif source_sampling_mode == "by_sequence_count":
+            weights = np.array([source_sequence_counts[index] for index in indices], dtype=np.float64)
+        else:
+            raise ValueError(f"Unsupported source_sampling_mode: {source_sampling_mode}")
+        source_probs_by_group[group_name] = weights / weights.sum()
+
+    return PoseTrainingCorpus(
+        group_names=group_names,
+        group_probs=group_probs,
+        group_to_source_indices=group_to_source_indices,
+        source_probs_by_group=source_probs_by_group,
+        sources=sources,
+        source_sequence_counts=source_sequence_counts,
+    )
+
+
+def sample_pose_frame(corpus: PoseTrainingCorpus, rng: np.random.Generator) -> Dict[str, Any]:
+    group_index = int(rng.choice(len(corpus.group_names), p=corpus.group_probs))
+    group_name = corpus.group_names[group_index]
+
+    source_choices = corpus.group_to_source_indices[group_name]
+    source_local_index = int(rng.choice(len(source_choices), p=corpus.source_probs_by_group[group_name]))
+    source = corpus.sources[source_choices[source_local_index]]
+
+    sequence = source.sequences[int(rng.integers(0, len(source.sequences)))]
+    frame_index = int(rng.integers(0, sequence["expression"].shape[0]))
+
+    return {
+        "expression": sequence["expression"][frame_index: frame_index + 1],
+        "jaw_pose": sequence["jaw_pose"][frame_index: frame_index + 1],
+        "leye_pose": sequence["leye_pose"][frame_index: frame_index + 1],
+        "reye_pose": sequence["reye_pose"][frame_index: frame_index + 1],
+        "neck_pose": sequence["neck_pose"][frame_index: frame_index + 1],
+        "group_label": group_name,
+        "source_name": source.source_name,
+    }
+
+
+def sample_pose_window(
+    corpus: PoseTrainingCorpus,
+    cursors: List[Dict[str, int]],
+    window_length: int,
+    window_stride: int = 1,
+    rng: np.random.Generator = None,
+) -> Dict[str, Any]:
+    rng = rng or np.random.default_rng()
+    group_index = int(rng.choice(len(corpus.group_names), p=corpus.group_probs))
+    group_name = corpus.group_names[group_index]
+
+    source_choices = corpus.group_to_source_indices[group_name]
+    source_local_index = int(rng.choice(len(source_choices), p=corpus.source_probs_by_group[group_name]))
+    source_index = source_choices[source_local_index]
+    return sample_pose_window_from_source(
+        corpus.sources,
+        cursors,
+        source_index=source_index,
+        window_length=window_length,
+        window_stride=window_stride,
+    )
 
 
 class RandomCameraIterableDataset(IterableDataset, Updateable):
@@ -147,7 +384,18 @@ class RandomCameraIterableDataset(IterableDataset, Updateable):
             flame_scale=-10
         )
 
-        self.pose_train_list = np.load(self.cfg.talkshow_train_path, allow_pickle=True)
+        normalized_inputs = normalize_train_pose_inputs(self.cfg)
+        input_specs = expand_pose_input_specs(
+            normalized_inputs["paths"],
+            normalized_inputs["group_labels"],
+        )
+        self.pose_corpus = build_pose_training_corpus(
+            input_specs,
+            dict(self.cfg.train_pose_group_weights),
+            self.cfg.source_sampling_mode,
+        )
+        self.pose_source_cursors = create_pose_source_cursors(self.pose_corpus.sources)
+        self.pose_rng = np.random.default_rng()
 
     def update_step(self, epoch: int, global_step: int, on_load_weights: bool = False):
         size_ind = bisect.bisect_right(self.resolution_milestones, global_step) - 1
@@ -404,15 +652,61 @@ class RandomCameraIterableDataset(IterableDataset, Updateable):
                                    None, :
                                    ].repeat(self.batch_size, 1)
 
+        temporal_enabled = False
+        temporal_source_name = None
+        temporal_source_index = None
+        temporal_sequence_index = None
+        temporal_frame_indices = None
+        temporal_primary_index = None
+        temporal_window_length = None
+        temporal_expression = None
+        temporal_jaw_pose = None
+        temporal_leye_pose = None
+        temporal_reye_pose = None
+        temporal_neck_pose = None
+
         if self.cfg.training_w_animation:
-            idx = random.randint(0, len(self.pose_train_list) - 1)
-            pose = self.pose_train_list[idx]
-            idx2 = random.randint(0, pose['expression'].shape[0] - 1)
-            expression = torch.from_numpy(pose['expression'][idx2: idx2 + 1]).to('cuda')
-            jaw_pose = torch.from_numpy(pose['jaw_pose'][idx2: idx2 + 1]).to('cuda')
-            leye_pose = torch.from_numpy(pose['leye_pose'][idx2: idx2 + 1]).to('cuda')
-            reye_pose = torch.from_numpy(pose['reye_pose'][idx2: idx2 + 1]).to('cuda')
-            neck_pose = torch.from_numpy(pose['neck_pose'][idx2: idx2 + 1]).to('cuda')
+            if self.cfg.temporal_window_enabled:
+                temporal_enabled = True
+                temporal_window_length = self.cfg.temporal_window_length
+                temporal_primary_index = self.cfg.temporal_primary_index
+                if not 0 <= temporal_primary_index < temporal_window_length:
+                    raise ValueError(
+                        "temporal_primary_index must be in [0, temporal_window_length)"
+                    )
+
+                sampled_pose = sample_pose_window(
+                    self.pose_corpus,
+                    self.pose_source_cursors,
+                    window_length=temporal_window_length,
+                    window_stride=self.cfg.temporal_window_stride,
+                    rng=self.pose_rng,
+                )
+                pose = sampled_pose["sequence"]
+                temporal_source_name = sampled_pose["source_name"]
+                temporal_source_index = sampled_pose["source_index"]
+                temporal_sequence_index = sampled_pose["sequence_index"]
+                temporal_frame_indices = sampled_pose["frame_indices"]
+
+                temporal_expression = torch.from_numpy(pose['expression'][temporal_frame_indices]).to('cuda')
+                temporal_jaw_pose = torch.from_numpy(pose['jaw_pose'][temporal_frame_indices]).to('cuda')
+                temporal_leye_pose = torch.from_numpy(pose['leye_pose'][temporal_frame_indices]).to('cuda')
+                temporal_reye_pose = torch.from_numpy(pose['reye_pose'][temporal_frame_indices]).to('cuda')
+                temporal_neck_pose = torch.from_numpy(pose['neck_pose'][temporal_frame_indices]).to('cuda')
+
+                primary_slice = slice(temporal_primary_index, temporal_primary_index + 1)
+                expression = temporal_expression[primary_slice]
+                jaw_pose = temporal_jaw_pose[primary_slice]
+                leye_pose = temporal_leye_pose[primary_slice]
+                reye_pose = temporal_reye_pose[primary_slice]
+                neck_pose = temporal_neck_pose[primary_slice]
+            else:
+                sampled_pose = sample_pose_frame(self.pose_corpus, self.pose_rng)
+                expression = torch.from_numpy(sampled_pose['expression']).to('cuda')
+                jaw_pose = torch.from_numpy(sampled_pose['jaw_pose']).to('cuda')
+                leye_pose = torch.from_numpy(sampled_pose['leye_pose']).to('cuda')
+                reye_pose = torch.from_numpy(sampled_pose['reye_pose']).to('cuda')
+                neck_pose = torch.from_numpy(sampled_pose['neck_pose']).to('cuda')
         else:
             expression = None
             jaw_pose = None
@@ -452,6 +746,18 @@ class RandomCameraIterableDataset(IterableDataset, Updateable):
             'leye_pose': leye_pose,
             'reye_pose': reye_pose,
             'neck_pose': neck_pose,
+            "temporal_enabled": temporal_enabled,
+            "temporal_source_name": temporal_source_name,
+            "temporal_source_index": temporal_source_index,
+            "temporal_sequence_index": temporal_sequence_index,
+            "temporal_frame_indices": temporal_frame_indices,
+            "temporal_primary_index": temporal_primary_index,
+            "temporal_window_length": temporal_window_length,
+            "temporal_expression": temporal_expression,
+            "temporal_jaw_pose": temporal_jaw_pose,
+            "temporal_leye_pose": temporal_leye_pose,
+            "temporal_reye_pose": temporal_reye_pose,
+            "temporal_neck_pose": temporal_neck_pose,
         }
 
 

@@ -24,6 +24,7 @@ from pytorch3d.renderer import (
     TexturesAtlas,
 )
 
+from gaussiansplatting.scene.flame_mesh import load_flashavatar_flame_faces
 from threestudio.utils.mediapipe_utils import draw_landmarks_468
 from threestudio.utils.mediapipe_utils_v2 import draw_landmarks_105
 
@@ -157,6 +158,13 @@ class FlamePointswRandomExp:
             num_expression_coeffs=self.num_expression,
             use_face_contour=True,
         ).to(self.device)
+        self.flame_faces = load_flashavatar_flame_faces()
+        self.flame_faces_tensor = torch.tensor(
+            self.flame_faces.astype(np.int32), dtype=torch.int32, device=self.device
+        )
+        self.official_flame_faces_tensor = torch.tensor(
+            self.model.faces.astype(np.int32), dtype=torch.int32, device=self.device
+        )
 
         self.center = 0
         self.scale = 0
@@ -385,8 +393,6 @@ class FlamePointswRandomExp:
 
         joints = output.joints.detach().squeeze()
 
-        faces = torch.tensor(self.model.faces.astype(np.int32), dtype=torch.int32, device=self.device)
-
         # threestudio -> FLAME
         # R, T = look_at_view_transform(
         #     dist, elev, (azim - 90),
@@ -403,12 +409,12 @@ class FlamePointswRandomExp:
 
         if lmk:
             if mediapipe:
-                cond_lmks = self.get_cond_lmk_mediapipe(vertices, faces, cameras)
+                cond_lmks = self.get_cond_lmk_mediapipe(vertices, self.official_flame_faces_tensor, cameras)
             else:
                 cond_lmks = self.get_cond_lmk_openpose(joints, cameras)
             result = torch.from_numpy(cond_lmks)
         else:
-            cond_depths = self.get_cond_depth(vertices, faces, cameras, mesh_vis)
+            cond_depths = self.get_cond_depth(vertices, self.flame_faces_tensor, cameras, mesh_vis)
             result = cond_depths
 
         return result
@@ -436,8 +442,6 @@ class FlamePointswRandomExp:
 
         joints = output.joints.detach().squeeze()
 
-        faces = torch.tensor(self.model.faces.astype(np.int32), dtype=torch.int32, device=self.device)
-
         cameras = self.get_camera(
             dist, elev, (azim - 90),
             self.camera_conversion(at),
@@ -448,7 +452,7 @@ class FlamePointswRandomExp:
         cond_pose = self.get_cond_lmk_openpose(joints, cameras)
         cond_pose = torch.from_numpy(cond_pose).float() / 255.0
 
-        cond_depth = self.get_cond_depth(vertices, faces, cameras)
+        cond_depth = self.get_cond_depth(vertices, self.flame_faces_tensor, cameras)
 
         return {
             'pose': cond_pose,

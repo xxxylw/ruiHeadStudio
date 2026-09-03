@@ -1,0 +1,16 @@
+run,metric,value,baseline,delta,improved
+content_valid_q0002,ViT-L/14 CLIP,0.287430,0.278400,0.009030,yes
+content_valid_q0002,ViT-B/16 CLIP,0.339916,0.313000,0.026916,yes
+content_valid_q0002,ViT-B/32 CLIP,0.311484,0.313100,-0.001616,no
+content_valid_q0002,PIQE,63.099900,59.930000,3.169900,no
+content_valid_q0002,MUSIQ,54.267580,51.360000,2.907580,yes
+content_valid_q0005,ViT-L/14 CLIP,0.289982,0.278400,0.011582,yes
+content_valid_q0005,ViT-B/16 CLIP,0.336910,0.313000,0.023910,yes
+content_valid_q0005,ViT-B/32 CLIP,0.309158,0.313100,-0.003942,no
+content_valid_q0005,PIQE,62.922252,59.930000,2.992252,no
+content_valid_q0005,MUSIQ,54.429206,51.360000,3.069206,yes
+content_valid_q0010,ViT-L/14 CLIP,0.287607,0.278400,0.009207,yes
+content_valid_q0010,ViT-B/16 CLIP,0.336949,0.313000,0.023949,yes
+content_valid_q0010,ViT-B/32 CLIP,0.310140,0.313100,-0.002960,no
+content_valid_q0010,PIQE,61.468688,59.930000,1.538688,no
+content_valid_q0010,MUSIQ,53.275495,51.360000,1.915495,yes

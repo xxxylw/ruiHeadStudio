@@ -1,0 +1,6 @@
+run,metric,value,baseline,delta,improved
+trust_l003_anchor,ViT-L/14 CLIP,0.266277,0.278400,-0.012123,no
+trust_l003_anchor,ViT-B/16 CLIP,0.315043,0.313000,0.002043,yes
+trust_l003_anchor,ViT-B/32 CLIP,0.307351,0.313100,-0.005749,no
+trust_l003_anchor,PIQE,66.427173,59.930000,6.497173,no
+trust_l003_anchor,MUSIQ,55.959326,51.360000,4.599326,yes
